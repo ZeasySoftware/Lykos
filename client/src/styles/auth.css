@@ -186,7 +186,32 @@
   border-radius: var(--r-md);
   background: var(--bg-input);
   font-size: var(--fs-sm);
-  white-space: pre-wrap;
+  line-height: 1.5;
+}
+/* Release-Notizen: Markdown aus dem Gitea-Release (ReleaseNotes.tsx) */
+.release-notes > :first-child {
+  margin-top: 0;
+}
+.release-notes > :last-child {
+  margin-bottom: 0;
+}
+.release-notes h3,
+.release-notes h4,
+.release-notes h5 {
+  margin: var(--sp-3) 0 var(--sp-1);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+.release-notes p {
+  margin: var(--sp-2) 0;
+}
+.release-notes ul {
+  margin: var(--sp-1) 0 var(--sp-2);
+  padding-left: 1.2em;
+}
+.release-notes li + li {
+  margin-top: 2px;
 }
 
 /* ---------- Powered by Zeasy Software ---------- */

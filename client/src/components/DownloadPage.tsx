@@ -3,6 +3,7 @@ import { Check, Copy, Download, Globe, ShieldAlert } from 'lucide-react'
 import { ApiError, endpoints } from '../lib/api'
 import type { DesktopRelease } from '../lib/api'
 import { Wordmark } from './Brand'
+import { ReleaseNotes } from './ReleaseNotes'
 import { PoweredBy } from './PoweredBy'
 
 type State = { kind: 'loading' } | { kind: 'ready'; release: DesktopRelease } | { kind: 'error'; text: string }
@@ -86,7 +87,9 @@ function ReleaseInfo({ release }: { release: DesktopRelease }) {
       {release.notes.trim() && (
         <details className="download-notes">
           <summary>Was ist neu in {release.version}?</summary>
-          <div className="download-notes-text">{release.notes}</div>
+          <div className="download-notes-text">
+            <ReleaseNotes text={release.notes} />
+          </div>
         </details>
       )}
     </>

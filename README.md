@@ -33,9 +33,17 @@ API: [docs/api.md](docs/api.md)
 
 ## Screenshots
 
-> _Platzhalter – Screenshots folgen._
->
-> `docs/screenshots/chat.png` · `docs/screenshots/call-stage.png` · `docs/screenshots/settings.png`
+![Chat einer Community mit Kanälen, Mitgliederliste, Antworten, Reaktionen und Erwähnungen](docs/screenshots/chat.png)
+
+| Freunde | Ton-Einstellungen |
+|---|---|
+| ![Freundesliste mit Status, Nachricht, Anruf und offener Anfrage](docs/screenshots/friends.png) | ![Sprache & Video: Mikrofon mit Lautstärke und Mikrofontest, Lautsprecher mit Testton](docs/screenshots/settings-voice.png) |
+
+| Handy | | Download |
+|---|---|---|
+| <img src="docs/screenshots/mobile-chat.png" alt="Chat auf dem Handy" width="220"> | <img src="docs/screenshots/mobile-drawer.png" alt="Schublade mit Communities und Kanälen auf dem Handy" width="220"> | <img src="docs/screenshots/download.png" alt="Download-Seite der Desktop-App mit Prüfsumme und Neuerungen" width="240"> |
+
+_Demo-Daten auf einer lokalen Instanz; alle Personen sind erfunden._
 
 ## Selbst hosten
 
@@ -329,7 +337,8 @@ Besonderheiten des Desktop-Bundles:
 
 ## Mitmachen
 
-Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md) und den
+Issues und Pull Requests auf **GitHub: <https://github.com/ZeasySoftware/Lykos>** (Spiegel des Originals auf
+<https://git.zeasy.dev/ZeasyAlex/Lykos>). Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md) und den
 [Verhaltenskodex](CODE_OF_CONDUCT.md). Sicherheitslücken bitte **nicht** öffentlich melden, sondern wie in
 [SECURITY.md](SECURITY.md) beschrieben.
 
