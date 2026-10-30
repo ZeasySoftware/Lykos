@@ -9,7 +9,7 @@ ebenfalls in Ordnung.
 
 **Wo?** Issues und Pull Requests bitte auf **GitHub: <https://github.com/ZeasySoftware/Lykos>**. Das Original liegt
 auf <https://git.zeasy.dev/ZeasyAlex/Lykos> (dort ist keine öffentliche Registrierung möglich); GitHub ist ein
-Spiegel mit identischen Commits und Tags.
+Spiegel mit identischen Commits und Tags (zieht automatisch innerhalb weniger Minuten nach).
 
 ## Bevor du loslegst
 
