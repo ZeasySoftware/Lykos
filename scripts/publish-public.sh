@@ -13,6 +13,7 @@
 #   --dry-run    Export nur in ein temporäres Verzeichnis, Dateiliste + Prüfung ausgeben, danach löschen.
 #   --ref <rev>  Zu exportierender Stand (Standard: HEAD). Nur Committetes wird exportiert.
 #   --force      Treffer der Prüfung auf interne Angaben nicht als Fehler werten (nur bewusst verwenden).
+#   -m <text>    Commit-Nachricht für --into (Standard: „Lykos <version>“), z. B. für Fehlerbehebungen zwischen Releases.
 #   --into <dir> Sauberer Klon des öffentlichen Repos: Inhalt wird durch den Export ersetzt und als
 #                „Lykos <version>“ committet (Autor Zeasy Software <info@zeasy.software>). Nichts wird gepusht.
 #
@@ -38,11 +39,12 @@ FORCE=0
 REF=HEAD
 TARGET=''
 INTO=''
+MESSAGE=''
 # Öffentliche Identität für Commits im öffentlichen Repo (keine persönlichen Adressen).
 PUBLIC_NAME='Zeasy Software'
 PUBLIC_EMAIL='info@zeasy.software'
 
-usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --force) FORCE=1 ;;
     --ref) REF="${2:?--ref braucht einen Wert}"; shift ;;
     --into) INTO="${2:?--into braucht einen Klon}"; shift ;;
+    -m) MESSAGE="${2:?-m braucht einen Text}"; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "Unbekannte Option: $1" >&2; usage >&2; exit 2 ;;
     *) [[ -z "$TARGET" ]] || { echo "Nur ein Zielverzeichnis erlaubt." >&2; exit 2; }; TARGET="$1" ;;
@@ -163,7 +166,7 @@ if [[ -n "$INTO" ]]; then
     exit 0
   fi
   git -C "$INTO" diff --cached --stat | tail -n 1
-  git -C "$INTO" -c user.name="$PUBLIC_NAME" -c user.email="$PUBLIC_EMAIL" commit -q -m "Lykos $VERSION" \
+  git -C "$INTO" -c user.name="$PUBLIC_NAME" -c user.email="$PUBLIC_EMAIL" commit -q -m "${MESSAGE:-Lykos $VERSION}" \
     -m "Quellstand: $SHORT (nicht öffentliche Historie)."
   git -C "$INTO" log --oneline -1
   cat <<EOF
