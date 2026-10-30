@@ -143,7 +143,7 @@ Migration `0007` hat `VIDEO`, Migration `0008` `ADD_REACTIONS` und Migration `00
 | GET | `/desktop/latest.json` | – | Statisches Tauri-Update-Manifest `{ version, notes, pub_date, platforms: { "windows-x86_64": { signature, url } } }`; `204` = kein Update (keine Konfiguration, kein Release oder keine `.sig`-Datei) |
 
 Quelle ist die Gitea-Release-Liste aus `LYKOS_DESKTOP_RELEASES_URL` (z. B.
-`https://git.zeasy.dev/api/v1/repos/ZeasyAlex/Lykos-Releases/releases`). Verwendet wird das neueste
+`https://api.github.com/repos/ZeasySoftware/Lykos/releases`; Gitea-Release-APIs funktionieren genauso). Verwendet wird das neueste
 Release, das kein Entwurf ist (Vorabversionen zählen) und ein Asset `*-setup.exe` hat; `version` ist der
 Tag ohne `v`. Daneben werden `<installer>.sha256` (`sha256sum`-Format) und `<installer>.sig`
 (Tauri-Updater-Signatur) gelesen – nur vom selben Host wie die API. Das Ergebnis wird 10 Minuten

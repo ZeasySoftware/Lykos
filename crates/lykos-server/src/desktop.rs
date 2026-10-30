@@ -1,4 +1,5 @@
-//! Desktop-Releases: neuester Windows-Installer aus dem öffentlichen Release-Repo (Gitea-API).
+//! Desktop-Releases: neuester Windows-Installer aus dem öffentlichen Release-Repo (Gitea- oder GitHub-API;
+//! beide liefern dieselben Felder).
 //!
 //! Quelle ist die Release-Liste (`LYKOS_DESKTOP_RELEASES_URL`). Verwendet wird das neueste
 //! veröffentlichte Release (keine Entwürfe; Vorabversionen zählen mit, der Pilot veröffentlicht nur
@@ -6,7 +7,7 @@
 //! (`sha256sum`-Format) und `<installer>.sig` (Tauri-Updater-Signatur). Daraus entstehen die Daten
 //! der Download-Seite und das statische Tauri-Update-Manifest (`latest.json`).
 //!
-//! Das Ergebnis wird im Speicher gecacht (`CACHE_TTL`). Ist Gitea nicht erreichbar, bleibt der
+//! Das Ergebnis wird im Speicher gecacht (`CACHE_TTL`). Ist die Release-API nicht erreichbar, bleibt der
 //! letzte Stand gültig und es wird nach `RETRY_AFTER` erneut versucht.
 
 use std::{
@@ -170,13 +171,19 @@ fn version_from_tag(tag: &str) -> Option<String> {
     ok.then(|| v.to_owned())
 }
 
-/// Liegt `url` auf demselben Host wie die Release-API? (Nur dorthin folgt der Server.)
+/// Liegt `url` auf dem Host der Release-API? Nur dorthin folgt der Server. Einzige Ausnahme: GitHub liefert
+/// die API unter `api.github.com`, die Release-Dateien aber unter `https://github.com` (von dort leitet
+/// GitHub auf seinen Datei-Host weiter).
 fn same_origin(base: &reqwest::Url, url: &str) -> Option<reqwest::Url> {
     let url = reqwest::Url::parse(url).ok()?;
-    (url.scheme() == base.scheme()
+    let same = url.scheme() == base.scheme()
         && url.host_str() == base.host_str()
-        && url.port_or_known_default() == base.port_or_known_default())
-    .then_some(url)
+        && url.port_or_known_default() == base.port_or_known_default();
+    let github = base.host_str() == Some("api.github.com")
+        && url.scheme() == "https"
+        && url.host_str() == Some("github.com")
+        && url.port_or_known_default() == Some(443);
+    (same || github).then_some(url)
 }
 
 /// Antwort stückweise lesen und abbrechen, sobald sie `max` Bytes überschreitet – ein großer oder
@@ -213,7 +220,8 @@ fn parse_sha256(text: &str) -> Option<String> {
 async fn fetch_latest(releases_url: &str) -> Result<Option<DesktopRelease>> {
     let base = reqwest::Url::parse(releases_url).context("LYKOS_DESKTOP_RELEASES_URL ungültig")?;
     let mut list_url = base.clone();
-    list_url.query_pairs_mut().append_pair("limit", RELEASES_LIMIT);
+    // `limit` versteht Gitea, `per_page` GitHub – der jeweils andere Parameter wird ignoriert.
+    list_url.query_pairs_mut().append_pair("limit", RELEASES_LIMIT).append_pair("per_page", RELEASES_LIMIT);
     let res = http()
         .get(list_url)
         .header(reqwest::header::ACCEPT, "application/json")
@@ -305,6 +313,17 @@ mod tests {
         assert!(same_origin(&base, "https://git.example:443/x.exe").is_some());
         assert!(same_origin(&base, "https://evil.example/x.exe").is_none());
         assert!(same_origin(&base, "http://git.example/x.exe").is_none());
+
+        // GitHub: API auf api.github.com, Dateien auf github.com – sonst nichts.
+        let gh = reqwest::Url::parse("https://api.github.com/repos/o/r/releases").unwrap();
+        assert!(same_origin(&gh, "https://github.com/o/r/releases/download/v1/x.exe").is_some());
+        assert!(same_origin(&gh, "https://api.github.com/x.exe").is_some());
+        assert!(same_origin(&gh, "http://github.com/o/r/x.exe").is_none());
+        assert!(same_origin(&gh, "https://github.com:8443/x.exe").is_none());
+        assert!(same_origin(&gh, "https://evil.github.com/x.exe").is_none());
+        assert!(same_origin(&gh, "https://objects.githubusercontent.com/x.exe").is_none());
+        // Die Ausnahme gilt nur für die GitHub-API als Basis.
+        assert!(same_origin(&base, "https://github.com/a/b/x.exe").is_none());
     }
 
     #[test]

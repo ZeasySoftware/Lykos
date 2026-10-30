@@ -9,7 +9,7 @@
     dist-desktop/Lykos-0.3.0-windows-x64-setup.exe.sha256   Prüfsumme (Download-Seite)
     dist-desktop/Lykos-0.3.0-windows-x64-setup.exe.sig      Updater-Signatur (Update-Manifest)
     dist-desktop/latest.json                                 Statisches Tauri-Update-Manifest
-  dist-desktop/ ist per .gitignore ausgeschlossen. Der Upload als Gitea-Release passiert separat:
+  dist-desktop/ ist per .gitignore ausgeschlossen. Der Upload als Release (GitHub ZeasySoftware/Lykos) passiert separat:
   .exe, .sha256 und .sig als Assets anhängen. Der Lykos-Server baut daraus GET /api/desktop/latest
   und /api/desktop/latest.json (LYKOS_DESKTOP_RELEASES_URL); latest.json liegt nur zur Kontrolle bzw.
   für statisches Hosting bei.
@@ -26,7 +26,7 @@
   Pfad zum privaten Updater-Schlüssel.
 
 .PARAMETER Notes
-  Versionshinweise für latest.json (der Server nimmt stattdessen den Text des Gitea-Releases).
+  Versionshinweise für latest.json (der Server nimmt stattdessen den Text des Releases).
 
 .PARAMETER ReleaseBaseUrl
   Download-Basis der Release-Assets; die Installer-URL ist <Basis>/v<Version>/<Datei>.
@@ -38,7 +38,7 @@ param(
   [switch]$SkipInstall,
   [string]$SigningKey = (Join-Path $env:USERPROFILE '.tauri\lykos-updater.key'),
   [string]$Notes = '',
-  [string]$ReleaseBaseUrl = 'https://git.zeasy.dev/ZeasyAlex/Lykos-Releases/releases/download'
+  [string]$ReleaseBaseUrl = 'https://github.com/ZeasySoftware/Lykos/releases/download'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -122,4 +122,4 @@ Write-Host "SHA-256:   $hash"
 Write-Host "Signatur:  $target.sig"
 Write-Host "Manifest:  $manifestPath"
 Write-Host ''
-Write-Host "Als Assets an Release v$version in Lykos-Releases hängen: .exe, .exe.sha256, .exe.sig" -ForegroundColor Cyan
+Write-Host "Release auf GitHub: gh release create v$version --repo ZeasySoftware/Lykos --prerelease <.exe> <.exe.sha256> <.exe.sig>" -ForegroundColor Cyan

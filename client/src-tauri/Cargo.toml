@@ -4,7 +4,7 @@ version = "0.5.0"
 description = "Lykos Desktop-Client"
 authors = ["Zeasy Software"]
 license = "AGPL-3.0-or-later"
-repository = "https://git.zeasy.dev/ZeasyAlex/Lykos"
+repository = "https://github.com/ZeasySoftware/Lykos"
 edition = "2024"
 rust-version = "1.90"
 

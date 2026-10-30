@@ -150,7 +150,7 @@ Verbindung (der Server warnt beim Start) – wer Port 8080 direkt erreicht, kön
 | `LYKOS_DATABASE_URL` | – (Pflicht) | Postgres-URL (im Compose-Stack automatisch) |
 | `LYKOS_BIND` | `0.0.0.0:8080` | Listen-Adresse |
 | `LYKOS_PUBLIC_URL` | `http://localhost:8080` | Öffentliche URL der Instanz |
-| `LYKOS_SOURCE_URL` | `https://git.zeasy.dev/ZeasyAlex/Lykos` | Quellcode der laufenden Fassung, verlinkt als „Quellcode (AGPL-3.0)“. **Wer Lykos verändert betreibt, muss hier seinen eigenen Code angeben** (AGPL §13) |
+| `LYKOS_SOURCE_URL` | `https://github.com/ZeasySoftware/Lykos` | Quellcode der laufenden Fassung, verlinkt als „Quellcode (AGPL-3.0)“. **Wer Lykos verändert betreibt, muss hier seinen eigenen Code angeben** (AGPL §13) |
 | `LYKOS_INSTANCE_NAME` | `Lykos` | Anzeigename |
 | `LYKOS_WEB_DIR` | – | Verzeichnis des gebauten Web-Clients (im Image gesetzt) |
 | `LYKOS_CORS_ORIGINS` | Tauri-Origins | Kommagetrennte erlaubte Origins (CORS und Gateway-WebSocket; der eigene Origin aus `LYKOS_PUBLIC_URL` ist immer erlaubt) |
@@ -169,7 +169,7 @@ Verbindung (der Server warnt beim Start) – wer Port 8080 direkt erreicht, kön
 | `LYKOS_LIVEKIT_URL` | – | Öffentliche LiveKit-URL für Clients (`wss://…`). Fehlt sie oder Key/Secret, ist Voice aus |
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | – | LiveKit-Zugangsdaten (Tokens, Webhook-Prüfung, RoomService) |
 | `LYKOS_LIVEKIT_API_URL` | `http://127.0.0.1:7880` | Interne HTTP-URL der LiveKit-API; im Compose-Stack `http://host.docker.internal:7880` |
-| `LYKOS_DESKTOP_RELEASES_URL` | – | Gitea-API einer Release-Liste für `/download` und das Update-Manifest der Desktop-App (`.env.example`: offizielle Releases). Leer = aus |
+| `LYKOS_DESKTOP_RELEASES_URL` | – | Release-Liste (GitHub- oder Gitea-API) für `/download` und das Update-Manifest der Desktop-App (`.env.example`: offizielle Releases). Leer = aus |
 | `LYKOS_FEEDBACK_GITEA_URL` / `_TOKEN` | – | Optional: Feedback-Meldungen per Admin-Klick als Gitea-Issue anlegen |
 | `LYKOS_MAIL` | automatisch | `smtp`, `log` (nur Entwicklung: Mails ins Log) oder `off`. Ohne Angabe `smtp`, sobald SMTP konfiguriert ist |
 | `LYKOS_MAIL_FROM` | – (Pflicht bei SMTP) | Absenderadresse; angezeigt als „Lykos“ |
@@ -313,7 +313,7 @@ sowie ein statisches `latest.json`. Die Version kommt aus `client/src-tauri/taur
 2. In `client/src-tauri/tauri.conf.json` `plugins.updater.pubkey` durch den eigenen Public Key und
    `plugins.updater.endpoints` durch `https://<deine-instanz>/api/desktop/latest.json` ersetzen; bei einem
    eigenständigen Fork auch `identifier`, `productName` und `DEFAULT_SERVER_URL` in `client/src/lib/api.ts`.
-3. Release mit `.exe`, `.exe.sha256`, `.exe.sig` in einem Gitea-Repo veröffentlichen und
+3. Release mit `.exe`, `.exe.sha256`, `.exe.sig` in einem GitHub- oder Gitea-Repo veröffentlichen und
    `LYKOS_DESKTOP_RELEASES_URL` darauf zeigen lassen.
 
 Ohne Updater-Signatur: `npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'`.
@@ -337,8 +337,7 @@ Besonderheiten des Desktop-Bundles:
 
 ## Mitmachen
 
-Issues und Pull Requests auf **GitHub: <https://github.com/ZeasySoftware/Lykos>** (Spiegel des Originals auf
-<https://git.zeasy.dev/ZeasyAlex/Lykos>). Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md) und den
+Issues und Pull Requests auf **GitHub: <https://github.com/ZeasySoftware/Lykos>**. Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md) und den
 [Verhaltenskodex](CODE_OF_CONDUCT.md). Sicherheitslücken bitte **nicht** öffentlich melden, sondern wie in
 [SECURITY.md](SECURITY.md) beschrieben.
 

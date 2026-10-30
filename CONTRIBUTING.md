@@ -7,9 +7,7 @@ in [SECURITY.md](SECURITY.md) beschrieben melden.
 Projektsprache ist Deutsch (Oberfläche, Code-Kommentare, Commits, Doku). Issues und Pull Requests auf Englisch sind
 ebenfalls in Ordnung.
 
-**Wo?** Issues und Pull Requests bitte auf **GitHub: <https://github.com/ZeasySoftware/Lykos>**. Das Original liegt
-auf <https://git.zeasy.dev/ZeasyAlex/Lykos> (dort ist keine öffentliche Registrierung möglich); GitHub ist ein
-Spiegel mit identischen Commits und Tags (zieht automatisch innerhalb weniger Minuten nach).
+**Wo?** Code, Releases, Issues und Pull Requests: **<https://github.com/ZeasySoftware/Lykos>**.
 
 ## Bevor du loslegst
 
@@ -62,8 +60,7 @@ Typen: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`. Ein Com
 2. Änderungen mit Tests; `CHANGELOG.md` unter „Unveröffentlicht“ ergänzen, wenn Nutzer oder Betreiber etwas davon
    merken.
 3. Lokal alle Prüfungen laufen lassen (fmt, clippy, Tests, Lint, Build). Auf GitHub prüft die CI jeden Pull Request
-   (GitHub-Runner); im Repo auf git.zeasy.dev läuft bewusst **keine** CI – der eigene Build-Runner führt keinen
-   fremden Code aus.
+   (GitHub-Runner).
 4. PR-Vorlage ausfüllen; bei UI-Änderungen Screenshots anhängen.
 
 So landet ein Beitrag im Code: Entwickelt wird in einem internen Repo (mit Betriebsnotizen, die nicht öffentlich

@@ -3,7 +3,7 @@ import { openExternalLink } from '../lib/external'
 import { useStore } from '../store'
 
 /** Offizieller Quellcode – falls der Server (älter) keinen nennt. */
-const DEFAULT_SOURCE_URL = 'https://git.zeasy.dev/ZeasyAlex/Lykos'
+const DEFAULT_SOURCE_URL = 'https://github.com/ZeasySoftware/Lykos'
 
 /**
  * Link „Quellcode (AGPL-3.0)“: Die AGPL verlangt, Nutzern eines Netzwerkdienstes den Quellcode der

@@ -13,7 +13,7 @@ use std::{
 use anyhow::{Context, Result};
 
 /// Offizieller Quellcode von Lykos – Standard für `LYKOS_SOURCE_URL`.
-pub const DEFAULT_SOURCE_URL: &str = "https://git.zeasy.dev/ZeasyAlex/Lykos";
+pub const DEFAULT_SOURCE_URL: &str = "https://github.com/ZeasySoftware/Lykos";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -51,7 +51,7 @@ pub struct Config {
     /// LiveKit-Anbindung für Voice/Screenshare; `None` = Voice deaktiviert.
     pub livekit: Option<LiveKitConfig>,
     /// Gitea-API-URL der Release-Liste des öffentlichen Release-Repos (Desktop-Download-Seite und
-    /// Update-Manifest), z. B. `https://git.zeasy.dev/api/v1/repos/ZeasyAlex/Lykos-Releases/releases`.
+    /// Update-Manifest), z. B. `https://api.github.com/repos/ZeasySoftware/Lykos/releases` (GitHub) oder `https://git.example.org/api/v1/repos/<besitzer>/<repo>/releases` (Gitea).
     /// `None` = keine Desktop-Downloads/Updates über diese Instanz. `LYKOS_DESKTOP_RELEASES_URL`.
     pub desktop_releases_url: Option<String>,
     /// Mailversand (Bestätigungslinks, Passwort-Reset, 2FA-Codes). `LYKOS_MAIL`, `LYKOS_SMTP_*`,
@@ -397,7 +397,7 @@ fn is_local_http(url: &str) -> bool {
 /// Zugang zum Gitea-Repo, in dem Admins Feedback-Meldungen als Issue anlegen können.
 #[derive(Clone, PartialEq, Eq)]
 pub struct FeedbackGiteaConfig {
-    /// API-Basis des Repos, z. B. `https://git.zeasy.dev/api/v1/repos/ZeasyAlex/Lykos`.
+    /// API-Basis des Repos, z. B. `https://git.example.org/api/v1/repos/<besitzer>/<repo>`.
     pub api_url: String,
     /// Zugriffstoken mit Schreibrecht auf Issues.
     pub token: String,
