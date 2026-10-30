@@ -1,0 +1,569 @@
+/*
+ * ---------- Mobil-Layout (≤ 768 px) ----------
+ * Alle Anpassungen für Telefone an einer Stelle, damit das Desktop-Layout unberührt bleibt.
+ * Umbruchpunkt: `MOBILE_MAX_WIDTH` in lib/mobile.ts (Media-Queries kennen keine CSS-Variablen –
+ * beide Werte gemeinsam ändern). Eine Spalte; Community-Rail + Kanalliste als Schublade,
+ * Mitglieder, Suche, Pins und Einstellungen als Vollbild-Ebenen, Menüs und Dialoge als Bottom-Sheet.
+ * `--app-height`/`--app-top` setzt lib/mobile.ts aus `visualViewport` (Bildschirmtastatur).
+ */
+
+/* Nur im Mobil-Layout sichtbare Bedienelemente (Hamburger, Zurück, Schließen in Vollbild-Ebenen). */
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Desktop-App-Download ergibt auf Telefonen keinen Sinn. */
+  .rail-download {
+    display: none;
+  }
+
+  :root {
+    /* Mindestgröße für Touch-Ziele */
+    --touch: 44px;
+    --drawer-w: min(calc(var(--rail-w) + 272px), 88vw);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --app-h: var(--app-height, 100dvh);
+  }
+
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  /* Formularfelder ab 16 px – sonst zoomt iOS beim Fokussieren hinein. */
+  input,
+  textarea,
+  select {
+    font-size: var(--fs-md);
+  }
+
+  /* App-Rahmen folgt der sichtbaren Fläche (über der Bildschirmtastatur). */
+  .ia-app-frame {
+    position: fixed;
+    top: var(--app-top, 0px);
+    left: 0;
+    right: 0;
+    height: var(--app-h);
+    padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  }
+
+  /* ---------- Gerüst: eine Spalte ---------- */
+
+  .shell,
+  .shell.with-members,
+  .shell.with-search {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'content';
+  }
+
+  /* ---------- Schublade: Rail + Kanalliste + Konto-Block ---------- */
+
+  .shell-drawer {
+    position: fixed;
+    top: var(--app-top, 0px);
+    left: 0;
+    z-index: 60;
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'rail sidebar'
+      'dock dock';
+    width: var(--drawer-w);
+    height: var(--app-h);
+    padding-top: var(--safe-top);
+    background: linear-gradient(to right, var(--bg-rail) var(--rail-w), var(--bg-sidebar) var(--rail-w));
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform var(--dur) var(--ease),
+      visibility 0s linear var(--dur);
+  }
+  .shell-drawer.open {
+    transform: none;
+    visibility: visible;
+    transition: transform var(--dur) var(--ease);
+  }
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: var(--bg-backdrop);
+    animation: fade-in var(--dur) var(--ease);
+  }
+  .account-dock-area {
+    padding-bottom: calc(var(--sp-2) + var(--safe-bottom));
+  }
+
+  /* Touch-Ziele in Rail, Kanalliste und Konto-Block */
+  .rail-item,
+  .rail-add {
+    width: 48px;
+    height: 48px;
+  }
+  .channel {
+    min-height: var(--touch);
+    font-size: var(--fs-base);
+  }
+  .dm-entry {
+    min-height: 52px;
+  }
+  .community-header-button {
+    min-height: var(--touch);
+  }
+  .icon-button,
+  .icon-button.small {
+    width: var(--touch);
+    height: var(--touch);
+  }
+  .channel-row .channel {
+    padding-right: var(--sp-2);
+  }
+  /* Kanal bearbeiten u. a. per langem Druck (Kontextmenü) – kein Hover-Zahnrad. */
+  .channel-settings {
+    display: none;
+  }
+  .channel-group > header {
+    min-height: var(--touch);
+  }
+  .status-picker-button {
+    min-height: var(--touch);
+  }
+
+  /* ---------- Kopfzeilen ohne Überlauf ---------- */
+
+  .pane-header {
+    position: relative;
+    gap: var(--sp-1);
+    padding: 0 var(--sp-1);
+  }
+  /* Platz für den Mitglieder-Schalter oben rechts (nur in Communities vorhanden). */
+  .content:has(> .members-toggle) .pane-header {
+    padding-right: calc(var(--touch) + var(--sp-2));
+  }
+  .pane-header > strong {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+  .pane-header > .channel-icon {
+    width: auto;
+  }
+  .pane-topic {
+    display: none;
+  }
+  /* Freundesliste: Titel weg, Tabs scrollen waagerecht, „Freund hinzufügen“ nur als Symbol. */
+  .friends-header > .channel-icon,
+  .friends-header > strong,
+  .friends-add-label {
+    display: none;
+  }
+  .friends-tabs {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    padding-left: 0;
+    border-left: none;
+    scrollbar-width: none;
+  }
+  .friends-tabs button,
+  .friends-add-toggle {
+    min-height: var(--touch);
+  }
+  .friends-add-toggle {
+    min-width: var(--touch);
+    justify-content: center;
+  }
+  .pane-actions {
+    position: static;
+    flex-shrink: 0;
+    margin-left: 0;
+  }
+  .members-toggle {
+    display: inline-flex;
+    top: calc((var(--header-h) - var(--touch)) / 2);
+    right: var(--sp-1);
+  }
+
+  /* Suche: nur die Lupe; aufgeklappt liegt das Feld über der ganzen Kopfzeile. */
+  .pane-actions .pane-search {
+    display: none;
+  }
+  .pane-actions .pane-search.expanded {
+    position: absolute;
+    inset: 4px var(--sp-2);
+    z-index: 4;
+    display: flex;
+    margin: 0;
+    padding-right: 0;
+    background: var(--bg-input);
+  }
+  .pane-search.expanded input {
+    flex: 1;
+    width: auto;
+    font-size: var(--fs-md);
+  }
+  .pane-search-cancel {
+    margin-left: auto;
+  }
+
+  /* ---------- Nachrichten ---------- */
+
+  .message {
+    padding-right: var(--sp-3);
+  }
+  /* Die Aktionsleiste hängt am Hover – auf Touch übernimmt das Kontextmenü (langer Druck). */
+  .message-actions {
+    display: none !important;
+  }
+  .composer {
+    padding: 0 var(--sp-2) calc(22px + var(--safe-bottom));
+  }
+  .composer textarea {
+    font-size: var(--fs-md);
+  }
+  .composer-attach,
+  .composer-emoji {
+    width: var(--touch);
+    height: var(--touch);
+  }
+  .typing-indicator {
+    margin-top: calc(-21px - var(--safe-bottom));
+    margin-bottom: var(--safe-bottom);
+    padding: 0 var(--sp-3);
+  }
+  .mention-suggestions {
+    left: var(--sp-2);
+    right: var(--sp-2);
+  }
+  .mention-suggestions button {
+    min-height: var(--touch);
+    align-items: center;
+  }
+  .reaction {
+    min-height: 32px;
+  }
+
+  /* ---------- Vollbild-Ebenen: Mitglieder, Suche, Pins ---------- */
+
+  .shell.with-members .members,
+  .members.members-overlay,
+  .search-panel,
+  .pins-popover {
+    position: fixed;
+    top: var(--app-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: auto;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    height: var(--app-h);
+    max-height: none;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+    border: none;
+    border-radius: 0;
+    background: var(--bg-content);
+    box-shadow: none;
+    animation: mobile-layer-in var(--dur) var(--ease);
+  }
+  .members-header {
+    justify-content: space-between;
+    padding-right: var(--sp-1);
+  }
+  .member {
+    min-height: 52px;
+  }
+  .member-message {
+    display: inline-flex;
+    margin-left: auto;
+  }
+  .search-panel-header {
+    padding-left: var(--sp-3);
+  }
+  .search-result {
+    padding-top: var(--sp-3);
+    padding-bottom: var(--sp-3);
+  }
+  .pins-popover > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--header-h);
+    padding: 0 var(--sp-1) 0 var(--sp-4);
+  }
+  .pins-popover ul {
+    flex: 1;
+  }
+  .pin-actions .link-button {
+    min-height: var(--touch);
+    padding: 0 var(--sp-2);
+  }
+
+  /* ---------- Menüs, Emoji-Auswahl, Profilkarte: Bottom-Sheets ---------- */
+
+  .ctx-menu {
+    top: auto !important;
+    right: var(--sp-2);
+    bottom: calc(var(--sp-2) + var(--safe-bottom));
+    left: var(--sp-2) !important;
+    min-width: 0 !important;
+    max-width: none;
+    max-height: min(72dvh, calc(var(--app-h) - var(--safe-top) - 48px));
+    padding: var(--sp-2);
+    border-radius: var(--r-xl);
+    font-size: var(--fs-base);
+    animation: sheet-in var(--dur) var(--ease);
+  }
+  /* Abdunklung hinter dem Hauptmenü (Untermenüs liegen als eigenes Blatt darüber). */
+  .ctx-menu-root {
+    box-shadow:
+      var(--shadow-lg),
+      0 0 0 100vmax var(--bg-backdrop);
+  }
+  .ctx-item {
+    min-height: var(--touch);
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+  }
+  .ctx-back {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--touch);
+    padding: 0 var(--sp-2);
+    border: none;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--sp-1);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .emoji-panel {
+    top: auto !important;
+    right: 0;
+    bottom: 0;
+    left: 0 !important;
+    width: 100%;
+    height: min(60dvh, 440px);
+    padding-bottom: var(--safe-bottom);
+    border-bottom: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    animation: sheet-in var(--dur) var(--ease);
+  }
+
+  .profile-card:not(.profile-card-static) {
+    top: auto !important;
+    right: 0;
+    bottom: 0;
+    left: 0 !important;
+    width: auto !important;
+    max-height: calc(var(--app-h) - var(--safe-top) - var(--sp-8));
+    overflow-y: auto;
+    padding-bottom: var(--safe-bottom);
+    border-bottom: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    animation: sheet-in var(--dur) var(--ease);
+  }
+
+  .status-menu {
+    width: min(300px, calc(100vw - 2 * var(--sp-4)));
+  }
+  .status-menu button,
+  .share-menu button {
+    min-height: var(--touch);
+  }
+
+  /* ---------- Dialoge: Bottom-Sheet, breite Dialoge im Vollbild ---------- */
+
+  .modal-backdrop {
+    top: var(--app-top, 0px);
+    bottom: auto;
+    height: var(--app-h);
+    align-items: end;
+    justify-items: stretch;
+    padding: var(--safe-top) 0 0;
+  }
+  .modal {
+    max-width: none;
+    max-height: calc(var(--app-h) - var(--safe-top) - var(--sp-6));
+    padding-bottom: var(--safe-bottom);
+    border-bottom: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    animation: sheet-in var(--dur) var(--ease);
+  }
+  .modal-wide {
+    height: calc(var(--app-h) - var(--safe-top));
+    max-height: none;
+    border: none;
+    border-radius: 0;
+  }
+  .modal-header {
+    padding: var(--sp-3) var(--sp-1) 0 var(--sp-4);
+  }
+  .modal-body {
+    padding: var(--sp-3) var(--sp-4) var(--sp-5);
+  }
+
+  /* ---------- Einstellungen: Liste → Unterseite mit Zurück ---------- */
+
+  .settings-layer {
+    top: var(--app-top, 0px);
+    bottom: auto;
+    height: var(--app-h);
+    flex-direction: column;
+    padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+    animation: mobile-layer-in var(--dur) var(--ease);
+  }
+  .settings-mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex-shrink: 0;
+    min-height: var(--header-h);
+    padding: 0 var(--sp-1);
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--bg-sidebar);
+  }
+  .settings-mobile-bar h2 {
+    flex: 1;
+    margin: 0;
+    padding-left: var(--sp-2);
+    font-size: var(--fs-lg);
+  }
+  .settings-mobile-bar .icon-button + h2 {
+    padding-left: 0;
+  }
+  .settings-layer.mobile-list .settings-main,
+  .settings-layer.mobile-page .settings-sidebar,
+  .settings-tools {
+    display: none;
+  }
+  .settings-sidebar {
+    flex: 1 1 auto;
+    max-height: none;
+    justify-content: stretch;
+  }
+  .settings-sidebar-inner {
+    width: 100%;
+    padding: var(--sp-2) var(--sp-3) calc(var(--sp-6) + var(--safe-bottom));
+  }
+  .settings-nav-item {
+    min-height: 48px;
+    font-size: var(--fs-md);
+  }
+  .settings-main {
+    flex: 1 1 auto;
+  }
+  .settings-content {
+    padding: var(--sp-4) var(--sp-4) calc(120px + var(--safe-bottom));
+  }
+  .unsaved-anchor {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: calc(var(--sp-3) + var(--safe-bottom));
+  }
+
+  /* ---------- Call-Bühne: eine Spalte, Steuerleiste unten ---------- */
+
+  .call-grid {
+    margin: var(--sp-2) var(--sp-2) 0;
+  }
+  .call-grid.scroll {
+    align-content: safe center;
+  }
+  .call-focus {
+    margin: var(--sp-2) var(--sp-2) 0;
+  }
+  .call-tile.strip {
+    width: 128px;
+    height: 72px;
+  }
+  .call-controls {
+    padding: var(--sp-2) var(--sp-2) calc(var(--sp-3) + var(--safe-bottom));
+  }
+  .call-controls-bar {
+    gap: var(--sp-1);
+    padding: 6px;
+  }
+  .call-control-more {
+    width: 30px;
+  }
+  /* Vollbild-API ist auf Telefonen unzuverlässig; die Bühne füllt den Bildschirm ohnehin. */
+  .call-fullscreen {
+    display: none;
+  }
+  .call-controls .share-menu {
+    position: fixed;
+    top: auto;
+    right: var(--sp-2);
+    bottom: calc(var(--sp-2) + var(--safe-bottom));
+    left: var(--sp-2);
+    translate: none;
+    max-width: none;
+  }
+  .call-preview {
+    padding: var(--sp-6) var(--sp-4);
+  }
+
+  /* ---------- Startseite ohne Kanal ---------- */
+
+  .welcome {
+    padding: var(--sp-6) var(--sp-5);
+  }
+  .welcome-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-height: var(--touch);
+    margin-top: var(--sp-5);
+  }
+
+  /* ---------- Hinweise ---------- */
+
+  .toasts {
+    bottom: calc(96px + var(--safe-bottom));
+  }
+}
+
+/* Touch-Geräte im Mobil-Layout: langer Druck öffnet das Kontextmenü statt Textauswahl/Systemmenü. */
+@media (max-width: 768px) and (pointer: coarse) {
+  .shell-drawer,
+  .messages,
+  .members,
+  .call-stage {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* Kein „klebender“ Hover nach dem Antippen. */
+  .message:not(.mentioned, .highlighted):hover,
+  .member:hover {
+    background: transparent;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes mobile-layer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}

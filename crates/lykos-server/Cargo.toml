@@ -1,0 +1,54 @@
+[package]
+name = "lykos-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+argon2 = "0.6.0"
+axum = { version = "0.8.9", features = ["multipart", "ws"] }
+base64 = "0.23.1"
+bytes = "1.12.1"
+futures-util = "0.3.34"
+imagesize = "0.15.0"
+infer = "0.22.0"
+# S3-Backend (Garage/MinIO/AWS): nur der S3-Teil, Kryptografie über ring statt aws-lc-rs.
+object_store = { version = "0.14.2", default-features = false, features = ["aws-base", "reqwest", "ring"] }
+hmac = "0.13.0"
+rand = "0.10.3"
+# HTTPS (Release-API, LiveKit, S3) über rustls mit ring als Provider (kein aws-lc-rs/C-Toolchain),
+# siehe `install_crypto_provider`. tls12 für ältere S3-Endpunkte.
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls-no-provider"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "time", "json"] }
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "net", "fs", "io-util"] }
+tokio-util = { version = "0.7.20", features = ["io"] }
+tower-http = { version = "0.7.1", features = ["fs", "trace", "cors", "compression-gzip", "compression-br"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+uuid = { version = "1.29.0", features = ["v7", "serde"] }
+# Paket G (Konto-Sicherheit):
+# SMTP-Versand über rustls/ring (kein native-tls/OpenSSL).
+lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "rustls-platform-verifier", "hostname"] }
+# Prüfung von OIDC-ID-Tokens (JWKS, RustCrypto statt aws-lc-rs).
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto"] }
+# QR-Code für die Authenticator-App als SVG (ohne Bildbibliothek).
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+# HMAC-SHA1 für TOTP (RFC 6238), passend zu hmac 0.13.
+sha1 = "0.11.0"
+# HTML-/Text-Vorlagen für Mails (templates/mail), Autoescape für .html.
+minijinja = { version = "3.0.5", default-features = false, features = ["builtins", "multi_template"] }
+
+[dev-dependencies]
+futures-util = "0.3.34"
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tokio-tungstenite = "0.30.0"
+tower = { version = "0.5.3", features = ["util"] }

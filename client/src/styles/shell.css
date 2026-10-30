@@ -1,0 +1,677 @@
+/* ---------- App-Gerüst: Raster, Community-Rail, Kanal-Leiste, Nutzerbereich, Mitglieder ---------- */
+
+/*
+ * Zwei Zeilen: oben Rail + Kanalleiste, unten der Konto-Block („dock“), der beide Spalten überspannt
+ * (wie bei Discord). Inhalt und rechte Spalte (Mitglieder/Suche) reichen über beide Zeilen.
+ */
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'rail sidebar content'
+    'dock dock content';
+  height: 100%;
+  background: var(--bg-content);
+}
+.shell.with-members {
+  grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr) var(--members-w);
+  grid-template-areas:
+    'rail sidebar content aside'
+    'dock dock content aside';
+}
+.shell.with-search {
+  grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr) var(--search-w);
+  grid-template-areas:
+    'rail sidebar content aside'
+    'dock dock content aside';
+}
+/* Hülle für Rail, Kanalleiste und Konto-Block: auf dem Desktop unsichtbar fürs Raster (`contents`),
+   im Mobil-Layout die Schublade (siehe mobile.css). */
+.shell-drawer {
+  display: contents;
+}
+.shell-drawer > .rail {
+  grid-area: rail;
+}
+.shell-drawer > .sidebar {
+  grid-area: sidebar;
+}
+.shell > .content {
+  grid-area: content;
+}
+.shell > .members,
+.shell > .search-panel {
+  grid-area: aside;
+}
+
+/* ---------- Konto-Block unten links (über Rail und Kanalleiste) ---------- */
+
+.account-dock-area {
+  grid-area: dock;
+  min-width: 0;
+  padding: 0 var(--sp-2) var(--sp-2);
+  /* Rail und Kanalleiste laufen optisch hinter dem Block weiter. */
+  background: linear-gradient(to right, var(--bg-rail) var(--rail-w), var(--bg-sidebar) var(--rail-w));
+}
+.account-dock {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+.account-dock .voice-panel {
+  border-top: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+}
+.account-dock .user-panel {
+  border-top: none;
+  background: transparent;
+}
+
+/* ---------- Community-Rail ---------- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 0;
+  padding: var(--sp-3) 0;
+  background: var(--bg-rail);
+  overflow: hidden;
+}
+.rail-logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 2px 0 4px;
+  flex-shrink: 0;
+}
+.rail-divider {
+  width: 28px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--border-strong);
+}
+.rail-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  /* volle Breite, damit der Pill-Indikator am linken Rand nicht abgeschnitten wird */
+  width: 100%;
+  min-height: 0;
+  padding: 2px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail-list::-webkit-scrollbar {
+  display: none;
+}
+
+/* Squircle-Kacheln: ruhige Fläche, Auswahl über Pill + Akzent-Kontur statt Vollfarbe */
+.rail-item,
+.rail-add {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: none;
+  border-radius: 15px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.rail-item:hover {
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+}
+.rail-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+/* Pill links am Rand: klein = ungelesen, mittel = Hover, groß = aktiv */
+.rail-item::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  width: 4px;
+  height: 0;
+  border-radius: 0 4px 4px 0;
+  background: var(--text-strong);
+  transform: translateY(-50%);
+  transition: height var(--dur) var(--ease);
+}
+.rail-item:hover::before {
+  height: 18px;
+}
+.rail-item.active::before {
+  height: 34px;
+}
+.rail-unread {
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  width: 4px;
+  height: 8px;
+  border-radius: 0 4px 4px 0;
+  background: var(--text-strong);
+  transform: translateY(-50%);
+}
+.rail-item:hover .rail-unread {
+  display: none;
+}
+.rail-mentions {
+  position: absolute;
+  right: -5px;
+  bottom: -4px;
+  border: 3px solid var(--bg-rail);
+  box-sizing: content-box;
+}
+
+.rail-add {
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.rail-add:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+/* Desktop-App installieren: grün wie der Update-Pfeil (auf Telefonen ausgeblendet, mobile.css). */
+.rail-download {
+  text-decoration: none;
+}
+.rail-download:hover {
+  background: var(--ok-soft);
+  color: var(--ok);
+  box-shadow: inset 0 0 0 1px var(--ok);
+}
+
+/* ---------- Kanal-Leiste ---------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-sidebar);
+}
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  height: var(--header-h);
+  flex-shrink: 0;
+  padding: 0 10px 0 var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-sans);
+}
+.sidebar-empty {
+  margin: 0;
+  padding: 6px var(--sp-4);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.channel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-2);
+}
+.channel-group + .channel-group {
+  margin-top: var(--sp-4);
+}
+.channel-group > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 26px;
+  padding: 0 2px 2px var(--sp-2);
+}
+
+.channel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--sp-2);
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.channel + .channel,
+.channel-row + .channel-row,
+.channel + .channel-row,
+.channel-row + .channel {
+  margin-top: 1px;
+}
+.channel:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.channel.active {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+.channel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.channel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.channel:hover .channel-icon,
+.channel.active .channel-icon {
+  color: var(--text-muted);
+}
+.channel.unread {
+  color: var(--text-strong);
+  font-weight: 650;
+}
+.channel.unread::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  width: 4px;
+  height: 8px;
+  border-radius: 0 4px 4px 0;
+  background: var(--text-strong);
+  transform: translateY(-50%);
+}
+
+.channel-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.channel-row .channel {
+  padding-right: 32px;
+}
+.channel-settings {
+  position: absolute;
+  right: 4px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.channel-row:hover .channel-settings,
+.channel-settings:focus-visible {
+  opacity: 1;
+}
+
+/* DM-Einträge */
+.dm-entry {
+  min-height: 44px;
+  gap: 10px;
+}
+.dm-entry-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.dm-entry-text .small {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+.dm-group-avatar {
+  border-radius: 50%;
+  background: var(--bg-elevated-2);
+  color: var(--text);
+}
+
+/* ---------- Nutzerbereich unten links ---------- */
+
+.user-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) 6px;
+  background: var(--bg-rail);
+  border-top: 1px solid var(--border-subtle);
+}
+.user-panel-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.user-panel-name {
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.status-picker-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 6px 4px 4px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.status-picker-button:hover {
+  background: var(--bg-hover);
+}
+.status-picker-label {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.status-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 248px;
+  padding: 6px;
+}
+.status-menu button {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+}
+.status-menu button .presence-dot {
+  margin-top: 6px;
+}
+.status-menu-hint {
+  display: block;
+  font-size: var(--fs-xs);
+}
+
+/* Verbindungsstatus (Text + Punkt) */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.status-online .status-dot {
+  background: var(--ok);
+}
+.status-offline .status-dot {
+  background: var(--danger);
+}
+
+/* ---------- Avatare & Präsenz ---------- */
+
+.avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.avatar-initial {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--bg-elevated-2);
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-elevated-2);
+}
+.presence-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.presence-online {
+  background: var(--ok);
+}
+.presence-idle {
+  background: var(--warn);
+}
+.presence-dnd {
+  background: var(--danger);
+}
+.presence-offline {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--text-faint);
+}
+.avatar-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border: 3px solid var(--bg-sidebar);
+  box-sizing: content-box;
+}
+.avatar-dot.presence-offline {
+  background: var(--bg-sidebar);
+}
+.user-panel .avatar-dot {
+  border-color: var(--bg-rail);
+}
+
+/* ---------- Inhalt ---------- */
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-content);
+}
+.members-toggle {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 2;
+}
+.welcome {
+  margin: auto;
+  max-width: 520px;
+  padding: var(--sp-8);
+  text-align: center;
+}
+.welcome-mark {
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--sp-4);
+  opacity: 0.9;
+}
+.welcome h1 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-2xl);
+}
+.welcome p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ---------- Mitgliederliste ---------- */
+
+.members {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-sidebar);
+  border-left: 1px solid var(--border-subtle);
+}
+.members-header {
+  display: flex;
+  align-items: center;
+  height: var(--header-h);
+  flex-shrink: 0;
+  padding: 0 var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.members-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-2) 0;
+}
+.member-group-title {
+  margin: var(--sp-3) var(--sp-4) var(--sp-1);
+}
+.member-group ul {
+  margin: 0;
+  padding: 0 var(--sp-2) var(--sp-2);
+  list-style: none;
+}
+.member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px var(--sp-2);
+  border-radius: var(--r-sm);
+  transition: background var(--dur-fast) var(--ease);
+}
+.member:hover {
+  background: var(--bg-hover);
+}
+.member-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.member-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+.member-owner {
+  display: inline-flex;
+  color: var(--warn);
+  vertical-align: middle;
+}
+.member-offline .member-name,
+.member-offline .avatar-initial,
+.member-offline .avatar-img {
+  opacity: 0.45;
+}
+.member-kick {
+  display: none;
+}
+.member:hover .member-kick {
+  display: inline;
+}
+.member-message {
+  display: none;
+  margin-left: auto;
+}
+.member:hover .member-message,
+.member-message:focus-visible {
+  display: inline-flex;
+}
+
+/* ---------- Schmale Fenster ---------- */
+
+@media (max-width: 900px) {
+  .shell.with-members,
+  .shell.with-search {
+    grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr);
+    grid-template-areas:
+      'rail sidebar content'
+      'dock dock content';
+  }
+  .shell.with-members .members {
+    display: none;
+  }
+  /* Mitgliederliste ist hier ohnehin ausgeblendet – der Schalter hätte keine Wirkung. */
+  .members-toggle {
+    display: none;
+  }
+  .pane-header {
+    padding-right: var(--sp-3);
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --sidebar-w: 212px;
+  }
+}

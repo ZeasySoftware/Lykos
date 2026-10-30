@@ -1,0 +1,592 @@
+/* ---------- Call-Bühne: Raster, Fokus, Steuerleiste, Vorschau, Mini-Ansicht ---------- */
+
+.call-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--bg-rail);
+}
+.call-stage.idle {
+  cursor: none;
+}
+.call-stage:fullscreen {
+  width: 100%;
+  height: 100%;
+}
+.call-stage:fullscreen .call-header {
+  display: none;
+}
+
+.call-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin: var(--sp-3) var(--sp-3) 0;
+  padding: 6px 6px 6px var(--sp-3);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+.call-banner.warn {
+  padding: 8px var(--sp-3);
+  border-color: transparent;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+/* Raster: Kachelgröße kommt aus gridLayout(), Flexbox zentriert auch eine unvollständige letzte Reihe. */
+.call-grid {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  margin: var(--sp-3) var(--sp-3) 0;
+  overflow: hidden;
+}
+.call-grid.scroll {
+  align-content: flex-start;
+  overflow-y: auto;
+}
+.call-less {
+  flex-basis: 100%;
+  max-width: 200px;
+  margin: var(--sp-2) auto;
+}
+
+/* ---------- Kachel ---------- */
+
+.call-tile {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--bg-sidebar);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.call-tile.screen {
+  background: #000;
+}
+.call-tile:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+/* Grüner Sprech-Rahmen über dem Bild */
+.call-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  pointer-events: none;
+  transition: box-shadow var(--dur-fast) var(--ease);
+}
+.call-tile.speaking::after {
+  box-shadow: inset 0 0 0 3px var(--ok);
+}
+.call-tile:fullscreen {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
+  background: #000;
+}
+
+.call-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--tile-color) 26%, var(--bg-sidebar));
+}
+.call-avatar {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow var(--dur-fast) var(--ease);
+}
+.call-avatar.speaking {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--tile-color, var(--bg-sidebar)) 26%, var(--bg-sidebar)),
+    0 0 0 6px var(--ok);
+}
+
+.call-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.call-video.contain {
+  object-fit: contain;
+}
+.call-video.mirrored {
+  transform: scaleX(-1);
+}
+.call-tile.spotlight.user.has-video {
+  background: #000;
+}
+
+.call-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.call-tile-label {
+  position: absolute;
+  left: var(--sp-2);
+  bottom: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 16px);
+  padding: 3px var(--sp-2);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  pointer-events: none;
+}
+.call-flag {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--danger);
+}
+
+.call-quality {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  display: inline-flex;
+  padding: 5px;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--warn);
+}
+.call-quality.lost {
+  color: var(--danger);
+}
+
+.call-tile-actions {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: flex;
+  gap: var(--sp-1);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.call-tile:hover .call-tile-actions,
+.call-tile:focus-within .call-tile-actions {
+  opacity: 1;
+}
+.call-tile-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+.call-tile-button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.call-tile-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+/* Nicht abonnierter Stream: erst auf Klick ansehen (spart Bandbreite). */
+.call-stream-offer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: color-mix(in srgb, var(--tile-color) 16%, var(--bg-rail));
+  color: var(--text-muted);
+  text-align: center;
+}
+.call-stream-offer-text {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.call-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.call-tile.strip .call-stream-offer,
+.call-tile.pill .call-stream-offer {
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+}
+.call-tile.strip .call-watch,
+.call-tile.pill .call-watch {
+  min-height: 26px;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+}
+
+/* „+N weitere“ */
+.call-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  border: none;
+  background: var(--bg-elevated);
+  color: var(--text-strong);
+  font: inherit;
+  font-weight: 600;
+}
+.call-more:hover {
+  background: var(--bg-elevated-2);
+}
+.call-more-avatars {
+  display: flex;
+}
+.call-more-avatars > * + * {
+  margin-left: -10px;
+}
+
+/* ---------- Fokus-Modus ---------- */
+
+.call-focus {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--sp-2);
+  min-height: 0;
+  margin: var(--sp-3) var(--sp-3) 0;
+}
+.call-spotlight {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.call-strip {
+  display: flex;
+  flex: none;
+  gap: var(--sp-2);
+  justify-content: safe center;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.call-tile.strip {
+  width: 160px;
+  height: 90px;
+}
+.call-tile.strip .call-tile-label {
+  left: 4px;
+  bottom: 4px;
+  max-width: calc(100% - 8px);
+  padding: 1px 6px;
+  font-size: var(--fs-2xs);
+}
+
+/* ---------- Steuerleiste ---------- */
+
+.call-controls {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.call-stage.idle .call-controls:not(:focus-within) {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+.call-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+}
+.call-control {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.call-control:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg-elevated-2) 80%, #fff);
+}
+.call-control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.call-control:focus-visible,
+.call-control-more:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus);
+}
+.call-control.off {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.call-control.off:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+.call-control.on {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.call-control.on:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ok) 24%, transparent);
+}
+.call-control.hangup {
+  width: 56px;
+  background: var(--danger-solid);
+  color: #fff;
+}
+.call-control.hangup:hover {
+  background: color-mix(in srgb, var(--danger-solid) 85%, #fff);
+}
+.call-control-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated-2);
+}
+.call-control-more {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 44px;
+  margin-left: -4px;
+  padding: 0 4px 0 0;
+  border: none;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.call-control-more:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+.call-control-more:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.call-fullscreen {
+  position: absolute;
+  right: var(--sp-4);
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.call-fullscreen:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+/* Menüs über der Steuerleiste (Kamera- und Qualitätswahl) */
+.call-controls .share-menu {
+  bottom: calc(100% + 12px);
+  left: 50%;
+  right: auto;
+  translate: -50% 0;
+  min-width: 220px;
+  max-width: 320px;
+}
+.call-controls .share-menu button {
+  min-width: 0;
+}
+.call-menu-note {
+  padding: 4px 10px 6px;
+}
+
+/* ---------- Vorschau (nicht beigetreten) ---------- */
+
+.call-preview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+}
+.call-preview h2 {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+}
+.call-preview p {
+  max-width: 460px;
+  margin: 0;
+}
+.call-preview-count {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.call-preview-avatars {
+  display: flex;
+  align-items: center;
+}
+.call-preview-avatar,
+.call-preview-more {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--bg-rail);
+}
+.call-preview-avatar + .call-preview-avatar,
+.call-preview-more {
+  margin-left: -14px;
+}
+.call-preview-more {
+  width: 64px;
+  height: 64px;
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+  font-weight: 650;
+}
+.call-preview-empty {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.call-join {
+  min-width: 200px;
+  min-height: 44px;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-md);
+}
+.call-preview-error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ---------- Mini-Ansicht über der Voice-Leiste ---------- */
+
+/* Erstes Element der Voice-Leiste (volle Breite über dem Status) */
+.call-pill {
+  position: relative;
+  flex: 0 0 100%;
+  margin-right: var(--sp-1);
+}
+.call-tile.pill {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.call-tile.pill .call-tile-label {
+  left: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  padding: 1px 6px;
+  font-size: var(--fs-xs);
+}
+.call-pill-pip {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.call-pill:hover .call-pill-pip,
+.call-pill-pip:focus-visible {
+  opacity: 1;
+}
+.call-pill-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: auto;
+  padding: 6px var(--sp-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.call-pill-row:hover {
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+}
+.call-pill-avatars {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.call-pill-avatars .call-avatar {
+  --tile-color: var(--bg-elevated);
+}
+.call-pill-avatars .call-avatar.speaking {
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    0 0 0 4px var(--ok);
+}
+.call-pill-avatars > * + * {
+  margin-left: -6px;
+}
+.call-pill-more {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.call-pill-text {
+  flex: 1;
+  text-align: left;
+}
+
+/* Sprachkanal, in dem man gerade ist, in der Kanalliste */
+.channel.connected .channel-icon {
+  color: var(--ok);
+}

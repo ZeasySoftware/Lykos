@@ -1,0 +1,297 @@
+/*
+ * ---------- Anrufe in DMs ----------
+ * Eingehender Anruf (Karte oben rechts, nicht modal), Anrufbereich über dem Verlauf einer DM
+ * (eingebettete Call-Bühne bzw. Leiste „Laufender Anruf“), Hinweise in der DM-Liste.
+ * Grün = annehmen/läuft, Rot = ablehnen/auflegen – wie bei der Call-Steuerung.
+ */
+
+/* Runde Anruf-Knöpfe (Annehmen, Ablehnen, mit Kamera) */
+.call-action {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.call-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.call-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.call-action.accept {
+  background: var(--ok);
+  color: var(--bg-rail);
+}
+.call-action.accept:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ok) 85%, #fff);
+}
+.call-action.decline {
+  background: var(--danger-solid);
+  color: var(--on-accent);
+}
+.call-action.decline:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger-solid) 85%, #fff);
+}
+
+/* ---------- Eingehende Anrufe ---------- */
+
+.incoming-calls {
+  position: fixed;
+  top: calc(var(--sp-4) + var(--titlebar-offset, 0px));
+  right: var(--sp-4);
+  /* über Dialogen (100) und Emoji-Picker (200), unter Kontextmenüs (300) */
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(360px, calc(100vw - 2 * var(--sp-4)));
+  pointer-events: none;
+}
+html.has-titlebar .incoming-calls {
+  --titlebar-offset: var(--titlebar-h);
+}
+.incoming-call {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: incoming-call-in var(--dur) var(--ease);
+}
+@keyframes incoming-call-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+.incoming-call-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.incoming-call-avatar {
+  position: relative;
+  flex: none;
+  border-radius: var(--r-full);
+}
+/* Pulsierender Ring um den Anrufer, solange es klingelt. */
+.incoming-call-avatar::after {
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--ok);
+  border-radius: var(--r-full);
+  content: '';
+  animation: call-pulse 1.6s var(--ease) infinite;
+}
+@keyframes call-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.92);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+.incoming-call-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.incoming-call-text strong {
+  color: var(--text-strong);
+  font-size: var(--fs-md);
+}
+.incoming-call-note {
+  font-size: var(--fs-xs);
+}
+.incoming-call-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incoming-call,
+  .incoming-call-avatar::after,
+  .dm-call-icon.ringing {
+    animation: none;
+  }
+}
+
+/* ---------- Anrufbereich über dem Verlauf ---------- */
+
+/* Eingebettete Bühne: feste Höhe über dem Verlauf, der darunter weiter scrollt. */
+.dm-call {
+  display: flex;
+  flex: none;
+  height: clamp(240px, 46%, 520px);
+  border-bottom: 1px solid var(--border);
+}
+.dm-call .call-stage.embedded {
+  flex: 1;
+}
+
+.call-banner.call-ringing {
+  padding: 6px 6px 6px var(--sp-3);
+  border-color: transparent;
+  background: var(--ok-soft);
+  color: var(--text-strong);
+}
+.call-ringing-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 28px;
+}
+.call-ringing-text svg {
+  color: var(--ok);
+}
+
+.dm-call-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--ok-soft);
+}
+.dm-call-bar-avatars {
+  display: flex;
+  flex: none;
+}
+.dm-call-bar-avatars > * + * {
+  margin-left: -8px;
+}
+.dm-call-bar-avatars .avatar {
+  box-shadow: 0 0 0 2px var(--bg-content);
+}
+.dm-call-bar-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.dm-call-bar-text strong {
+  color: var(--text-strong);
+}
+.dm-call-bar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.dm-call-bar-actions .call-action {
+  width: 36px;
+  height: 36px;
+}
+.call-join-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- DM-Liste ---------- */
+
+.dm-call-hint {
+  color: var(--ok);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.dm-call-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  margin-left: auto;
+  color: var(--ok);
+}
+.dm-call-icon.ringing {
+  animation: call-wiggle 1.2s var(--ease) infinite;
+}
+@keyframes call-wiggle {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  10%,
+  30%,
+  50% {
+    transform: rotate(-12deg);
+  }
+  20%,
+  40% {
+    transform: rotate(12deg);
+  }
+}
+
+/* ---------- Systemnachricht „Anruf verpasst“ ---------- */
+
+.system-message.call-missed .system-message-icon {
+  color: var(--danger);
+}
+
+/* ---------- Mobil (≤ 768 px, vgl. mobile.css) ---------- */
+
+@media (max-width: 768px) {
+  .incoming-calls {
+    top: calc(var(--safe-top, 0px) + var(--sp-2));
+    right: var(--sp-2);
+    left: var(--sp-2);
+    width: auto;
+  }
+  .incoming-call {
+    padding: var(--sp-3);
+  }
+  .incoming-call-actions {
+    justify-content: space-between;
+  }
+  .incoming-call-actions .call-action {
+    width: 52px;
+    height: 52px;
+  }
+  .dm-call {
+    height: clamp(220px, 52%, 460px);
+  }
+  .dm-call-bar {
+    flex-wrap: wrap;
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .dm-call-bar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .dm-call-bar-actions .call-action,
+  .call-join-button {
+    min-height: var(--touch, 44px);
+  }
+  .dm-call-bar-actions .call-action {
+    width: var(--touch, 44px);
+  }
+}

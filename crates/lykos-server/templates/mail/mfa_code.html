@@ -1,0 +1,4 @@
+{% extends "_base.html" %}
+{% block heading %}Dein Bestätigungscode{% endblock %}
+{% block intro %}mit diesem Code bestätigst du deine Anmeldung bzw. Änderung auf <strong>{{ instance }}</strong>. Gib ihn niemandem weiter – niemand von {{ instance }} wird dich je danach fragen.{% endblock %}
+{% block notice %}Dann kennt womöglich jemand dein Passwort. <a class="ly-link" href="{{ public_url }}" target="_blank" style="color:#5a48c4;">Melde dich an</a> und ändere es bitte sofort.{% endblock %}

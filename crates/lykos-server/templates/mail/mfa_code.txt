@@ -1,0 +1,4 @@
+{% extends "_base.txt" %}
+{% block heading %}Dein Bestätigungscode{% endblock %}
+{% block intro %}mit diesem Code bestätigst du deine Anmeldung bzw. Änderung auf {{ instance }}. Gib ihn niemandem weiter – niemand von {{ instance }} wird dich je danach fragen.{% endblock %}
+{% block notice %}Dann kennt womöglich jemand dein Passwort. Melde dich an und ändere es bitte sofort.{% endblock %}

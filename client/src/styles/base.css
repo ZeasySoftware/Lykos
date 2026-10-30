@@ -1,0 +1,199 @@
+/* ---------- Grundlagen: Reset, Typografie, Hilfsklassen, Fokus, Scrollleisten, Bewegung ---------- */
+
+:root {
+  color-scheme: dark;
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  font-optical-sizing: auto;
+  /* Inter: gerades l mit Fuß (cv05) und offenes Ziffern-Design (cv11/ss01 wären zu verspielt) */
+  font-feature-settings: 'cv05' 1;
+  line-height: var(--lh);
+  color: var(--text);
+  background: var(--bg-content);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg-content);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--text-strong);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.01em;
+}
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+h3 {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: rgba(124, 108, 240, 0.4);
+  color: var(--text-strong);
+}
+
+/* Zeiten, Zähler, Größen: tabellarische Ziffern */
+time,
+.tnum,
+progress {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kleine Überschriften in Großbuchstaben (Gruppen, Abschnitte) */
+.eyebrow,
+.channel-group > header,
+.members-header,
+.member-group-title,
+.share-menu-title,
+.profile-card-body h4,
+.new-divider,
+.radio-group legend {
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+/* ---------- Hilfsklassen ---------- */
+
+.muted {
+  color: var(--text-muted);
+}
+.small {
+  font-size: var(--fs-sm);
+}
+.center {
+  text-align: center;
+}
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+.success {
+  margin: 0;
+  color: var(--ok);
+}
+.notice {
+  margin: 0;
+  padding: var(--sp-3) 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+.truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.splash {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  background: var(--bg-rail);
+  color: var(--text-muted);
+}
+
+/* Vektor-Icons (lucide) */
+.lucide {
+  flex-shrink: 0;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Fokus (nur Tastatur) ---------- */
+
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Scrollleisten ---------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 210, 235, 0.14) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--r-full);
+  background: rgba(200, 210, 235, 0.14) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(200, 210, 235, 0.24);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---------- Weniger Bewegung ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

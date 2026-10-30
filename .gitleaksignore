@@ -1,0 +1,9 @@
+# Bekannte Fehlalarme von gitleaks: ausschließlich erfundene Testwerte, keine echten Schlüssel.
+# diagnostics.test.ts / feedback.rs: Testeingaben für das Schwärzen von Tokens in Fehlerberichten.
+client/src/lib/diagnostics.test.ts:generic-api-key:33
+crates/lykos-server/src/feedback.rs:generic-api-key:546
+# mail.rs: Platzhalter-Links der Mail-Vorschau (Base64 von „ChangeMePleaseItsAToken“ / „ResetMePleaseItsAToken“).
+crates/lykos-server/src/mail.rs:generic-api-key:469
+crates/lykos-server/src/mail.rs:generic-api-key:479
+# admin_instance.rs: Testpasswort.
+crates/lykos-server/tests/admin_instance.rs:generic-api-key:409

@@ -1,0 +1,548 @@
+/* ---------- Kontextmenüs & Dropdowns, Toasts, Schalter, Bestätigungen ---------- */
+
+.ctx-menu {
+  position: fixed;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: 300px;
+  max-height: calc(100vh - 16px);
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  user-select: none;
+  animation: menu-in var(--dur-fast) var(--ease);
+  scrollbar-width: thin;
+}
+.ctx-submenu {
+  animation-duration: 90ms;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: var(--r-xs);
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.25;
+  cursor: pointer;
+  outline: none;
+}
+.ctx-item.active,
+.ctx-item.expanded {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.ctx-item.danger {
+  color: var(--danger);
+}
+.ctx-item.danger.active {
+  background: var(--danger-solid);
+  color: #fff;
+}
+.ctx-item.disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+.ctx-item.disabled.active {
+  background: transparent;
+  color: var(--text-faint);
+}
+.ctx-label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.ctx-desc {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+.ctx-item.active .ctx-desc {
+  color: inherit;
+  opacity: 0.85;
+}
+.ctx-icon,
+.ctx-lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: inherit;
+  opacity: 0.85;
+}
+.ctx-lead {
+  width: 16px;
+  justify-content: center;
+}
+.ctx-hint {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.ctx-item.active .ctx-hint {
+  color: inherit;
+  opacity: 0.8;
+}
+.ctx-separator {
+  height: 1px;
+  margin: 4px 6px;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.ctx-header {
+  padding: 6px 8px 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* Haken (Checkbox) und Punkt (Radio) rechts */
+.ctx-check {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  color: var(--on-accent);
+}
+.ctx-check.on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.ctx-item.active .ctx-check {
+  border-color: currentColor;
+}
+.ctx-item.active .ctx-check.on {
+  background: var(--on-accent);
+  color: var(--accent);
+}
+.ctx-radio {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+}
+.ctx-radio.on {
+  border: 5px solid var(--accent);
+}
+.ctx-item.active .ctx-radio {
+  border-color: currentColor;
+}
+.ctx-item.active .ctx-radio.on {
+  border-color: var(--on-accent);
+}
+.ctx-item .role-dot {
+  width: 12px;
+  height: 12px;
+}
+.ctx-item .presence-dot {
+  box-shadow: 0 0 0 2px var(--bg-elevated);
+}
+
+/* Schnellreaktionen */
+.ctx-reactions {
+  display: flex;
+  gap: 4px;
+  padding: 2px 2px 4px;
+}
+.ctx-reaction {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--bg-elevated-2);
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.ctx-reaction:hover,
+.ctx-reaction:focus-visible {
+  background: var(--bg-active);
+  color: var(--text-strong);
+  transform: scale(1.06);
+}
+.ctx-reaction:focus-visible {
+  box-shadow: var(--ring);
+}
+.ctx-reaction.me {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+/* Lautstärke-Regler im Menü */
+.ctx-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+}
+.ctx-slider-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ctx-custom.active .ctx-slider-head > span:first-child {
+  color: var(--text-strong);
+}
+.ctx-slider input[type='range'] {
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  border-radius: var(--r-full);
+  background: linear-gradient(to right, var(--accent) var(--fill, 100%), var(--bg-input) var(--fill, 100%));
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+.ctx-slider input[type='range']::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+  appearance: none;
+}
+.ctx-slider input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-strong);
+}
+.ctx-slider input[type='range']:focus-visible {
+  box-shadow: var(--ring);
+}
+
+/* ---------- Community-Name als Dropdown-Auslöser ---------- */
+
+.sidebar-header:has(.community-header-button) {
+  padding: 0;
+}
+.community-header-button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--sp-3) 0 var(--sp-4);
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.community-header-button:hover,
+.community-header-button[aria-expanded='true'] {
+  background: var(--bg-hover);
+}
+.community-header-button .truncate {
+  flex: 1;
+}
+.community-header-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--dur) var(--ease);
+}
+.community-header-button[aria-expanded='true'] .community-header-chevron {
+  transform: rotate(180deg);
+}
+
+/* Stummgeschaltet: tritt zurück */
+.channel.muted-channel {
+  color: var(--text-faint);
+}
+.channel.muted-channel .channel-icon {
+  color: var(--text-faint);
+}
+.rail-item.muted-community {
+  opacity: 0.6;
+}
+.rail-item.muted-community:hover,
+.rail-item.muted-community.active {
+  opacity: 1;
+}
+
+/* Deaktivierte Kanäle (per aria-disabled, damit Rechtsklick funktioniert) */
+.channel[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.channel[aria-disabled='true']:hover {
+  background: transparent;
+}
+/* Sprachkanal ohne Voice auf der Instanz: gedimmt, Klick öffnet nur die Vorschau mit Hinweis. */
+.channel.voice-unavailable:not(.active) {
+  opacity: 0.6;
+}
+.voice-participant[aria-disabled='true'] {
+  cursor: default;
+}
+.voice-flag.local {
+  color: var(--danger);
+}
+
+/* ---------- Toasts ---------- */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sp-6);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-elevated-2);
+  box-shadow: var(--shadow-md);
+  color: var(--text-strong);
+  font-size: 14px;
+  pointer-events: auto;
+  animation: toast-in var(--dur) var(--ease);
+}
+.toast-error {
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+.toast-error span {
+  color: var(--text-strong);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------- Schalter ---------- */
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated-2);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.switch.on {
+  background: var(--accent);
+  box-shadow: none;
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition:
+    transform var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+.switch.on .switch-thumb {
+  background: #fff;
+  transform: translateX(16px);
+}
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.switch:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.switch-row:last-child {
+  border-bottom: none;
+}
+.switch-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.switch-row-title {
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 550;
+}
+.switch-row-desc {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.switch-row.disabled .switch-row-title {
+  color: var(--text-muted);
+}
+
+/* ---------- Bestätigung, Kanaltyp ---------- */
+
+.modal-compact {
+  max-width: 440px;
+}
+.confirm-message {
+  color: var(--text);
+  font-size: 15px;
+  line-height: var(--lh);
+}
+.confirm-message p {
+  margin: 0 0 var(--sp-2);
+}
+.confirm-message p:last-child {
+  margin-bottom: 0;
+}
+.confirm-quote {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kind-cards {
+  gap: var(--sp-2);
+}
+.kind-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 10px var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+.kind-card > span {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.kind-card strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.kind-card:hover {
+  background: var(--bg-hover);
+}
+.kind-card.active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Animationen reduzieren (Einstellung „Erweitert“ – ergänzt prefers-reduced-motion) */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Community-Dropdown: Kopf mit Banner/Beschreibung und Name auf dem Banner */
+.ctx-custom .community-info-card {
+  position: static;
+  margin: -6px -6px 0;
+  border: none;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  box-shadow: none;
+  animation: none;
+  user-select: text;
+}
+.sidebar-header.has-banner .community-header-button {
+  align-items: flex-end;
+  padding-bottom: 10px;
+}
+.sidebar-header.has-banner .community-header-button:hover,
+.sidebar-header.has-banner .community-header-button[aria-expanded='true'] {
+  background: rgba(0, 0, 0, 0.18);
+}
+.sidebar-header.has-banner .community-header-chevron {
+  color: #fff;
+}

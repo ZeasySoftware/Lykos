@@ -1,0 +1,39 @@
+name: Funktion vorschlagen
+description: Idee für eine neue Funktion oder Verbesserung.
+title: "[Vorschlag] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lykos konzentriert sich auf Text, Voice, Dateien und Streams mit minimaler Datenerhebung (siehe `PROJECT.md`).
+        Bitte vorher nach bestehenden Vorschlägen suchen.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem löst der Vorschlag?
+      description: Beschreibe die Situation, nicht nur die Lösung.
+    validations:
+      required: true
+  - type: textarea
+    id: loesung
+    attributes:
+      label: Vorgeschlagene Lösung
+    validations:
+      required: true
+  - type: textarea
+    id: alternativen
+    attributes:
+      label: Alternativen
+      description: Andere Wege, die du bedacht hast.
+  - type: textarea
+    id: datenschutz
+    attributes:
+      label: Datenschutz
+      description: Werden neue Daten erhoben oder Dritte (z. B. externe APIs) eingebunden?
+  - type: checkboxes
+    id: mithilfe
+    attributes:
+      label: Mithilfe
+      options:
+        - label: Ich würde das gern selbst umsetzen (Pull Request).

@@ -1,0 +1,137 @@
+/* ---------- Eigene Titelleiste der Desktop-App (Fenster ohne Rahmen) ----------
+ * Nur aktiv mit `html.has-titlebar` (gesetzt von lib/desktop.ts im Tauri-Fenster) – der Web-Client bleibt unverändert.
+ * Die Leiste liegt fest oben; die App rückt um `--titlebar-h` nach unten, Vollbild-Ebenen ebenso.
+ * Ebene: über Modals/Einstellungen/Lightbox (100/90/200), unter Kontextmenüs (300) und Toasts (400).
+ */
+
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  height: var(--titlebar-h);
+  background: var(--bg-rail);
+  color: var(--text-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.titlebar-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 100%;
+  padding: 0 var(--sp-2) 0 var(--sp-3);
+}
+.titlebar-mark {
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+.titlebar-name {
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  pointer-events: none;
+}
+
+.titlebar-context {
+  flex: 0 1 auto;
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  color: var(--text-muted);
+  /* Text gehört zur Zieh-Fläche */
+  pointer-events: none;
+}
+
+.titlebar-spacer {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: var(--sp-8);
+}
+
+.titlebar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-2);
+}
+.titlebar-actions:empty {
+  display: none;
+}
+
+.titlebar-controls {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+}
+.titlebar-button {
+  display: grid;
+  place-items: center;
+  width: var(--titlebar-button-w);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: default;
+  transition: background-color var(--dur-fast) linear;
+}
+.titlebar-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.titlebar-button:active {
+  background: var(--bg-active);
+}
+.titlebar-close:hover {
+  background: var(--window-close-hover);
+  color: var(--on-accent);
+}
+.titlebar-close:active {
+  background: var(--window-close-active);
+  color: var(--on-accent);
+}
+/* „Wiederherstellen“: zwei überlappende Fenster, gespiegelt wie das Windows-Symbol */
+.titlebar-restore {
+  transform: scaleX(-1);
+}
+.titlebar-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* ---------- App unter der Leiste ---------- */
+
+html.has-titlebar #root {
+  padding-top: var(--titlebar-h);
+}
+
+/* Vollbild-Ebenen beginnen unter der Leiste (Fensterknöpfe bleiben erreichbar). */
+html.has-titlebar .settings-layer,
+html.has-titlebar .ia-layer,
+html.has-titlebar .modal-backdrop,
+html.has-titlebar .lightbox {
+  top: var(--titlebar-h);
+}
+html.has-titlebar .oidc-notice {
+  top: calc(var(--titlebar-h) + var(--sp-4));
+}
+@media (max-width: 900px) {
+  html.has-titlebar .search-panel {
+    top: var(--titlebar-h);
+  }
+}
+@media (max-width: 640px) {
+  html.has-titlebar .settings-tools {
+    top: calc(var(--titlebar-h) + var(--sp-2));
+  }
+}

@@ -1,0 +1,5 @@
+{% extends "_base.html" %}
+{% block heading %}Deine E-Mail-Adresse wurde geändert{% endblock %}
+{% block intro %}für dein Lykos-Konto auf <strong>{{ instance }}</strong> ist ab sofort die Adresse <strong>{{ new_email }}</strong> hinterlegt. An diese Adresse hier schicken wir nichts mehr – auch keine Links zum Zurücksetzen des Passworts.{% endblock %}
+{% block notice_title %}Das warst nicht du?{% endblock %}
+{% block notice %}Dann hat womöglich jemand Zugriff auf dein Konto. <a class="ly-link" href="{{ public_url }}" target="_blank" style="color:#5a48c4;">Melde dich sofort an</a>, ändere dein Passwort und prüfe deine Kontoeinstellungen. Kommst du nicht mehr hinein, wende dich an die Administration von {{ instance }}.{% endblock %}

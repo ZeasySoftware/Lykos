@@ -1,0 +1,555 @@
+/* ---------- Instanz-Verwaltung (Paket H): Vollbild-Ebene, Kacheln, Tabellen, Ankündigungs-Banner ---------- */
+/* Alle Klassen mit Präfix `ia-` (instance admin), damit sie nicht mit `.admin-*` der Community-Verwaltung kollidieren. */
+
+/* App-Rahmen: Banner oben, darunter die Shell */
+.ia-app-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ia-app-frame > .shell {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.ia-announcement {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
+}
+.ia-announcement > .lucide {
+  flex-shrink: 0;
+  color: var(--accent-strong);
+}
+.ia-announcement p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Einstiegspunkte */
+.ia-rail-button {
+  margin-top: var(--sp-1);
+}
+.ia-settings-entry > .lucide {
+  color: var(--accent-strong);
+}
+
+/* ---------- Ebene ---------- */
+
+.ia-layer {
+  position: fixed;
+  inset: 0;
+  /* unter Modals (z-index 100), damit Bestätigungsdialoge darüber erscheinen */
+  z-index: 90;
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(0, 3.2fr);
+  background: var(--bg-content);
+  animation: fade-in var(--dur) var(--ease);
+}
+.ia-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--sp-8) var(--sp-3) var(--sp-6);
+  background: var(--bg-sidebar);
+  overflow-y: auto;
+}
+.ia-nav > * {
+  width: 100%;
+  max-width: 220px;
+}
+.ia-nav-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: 0 10px;
+  color: var(--text-strong);
+}
+.ia-nav-title > .lucide {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-strong);
+}
+.ia-nav-title > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ia-nav button {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 34px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.ia-nav button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.ia-nav button.active {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+.ia-content {
+  position: relative;
+  min-width: 0;
+  overflow-y: auto;
+}
+.ia-content-inner {
+  max-width: 980px;
+  padding: var(--sp-8) 72px var(--sp-8) var(--sp-8);
+}
+.ia-close {
+  position: absolute;
+  top: var(--sp-6);
+  right: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ia-close:hover {
+  color: var(--text-strong);
+}
+/* Gleiche Optik wie der Schließen-Knopf der Einstellungen (.settings-close). */
+.ia-close > .lucide {
+  box-sizing: content-box;
+  padding: 6px;
+  border: 2px solid var(--text-faint);
+  border-radius: var(--r-full);
+}
+.ia-close:hover > .lucide {
+  border-color: var(--text-muted);
+  background: var(--bg-hover);
+}
+
+@media (max-width: 760px) {
+  .ia-layer {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .ia-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: var(--sp-3);
+  }
+  .ia-nav > * {
+    width: auto;
+  }
+  /* Rechts Platz für den Schließen-Knopf lassen (sonst liegt er über „Aktualisieren“/„Treffer“). */
+  .ia-content-inner {
+    padding: var(--sp-4) 64px var(--sp-4) var(--sp-4);
+  }
+  .ia-close {
+    top: var(--sp-3);
+    right: var(--sp-2);
+  }
+}
+
+/* ---------- Bereiche ---------- */
+
+.ia-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.ia-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 36px;
+}
+.ia-section-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+}
+.ia-section > .muted.small {
+  margin: -8px 0 0;
+}
+.ia-subhead {
+  margin: var(--sp-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ia-card {
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+}
+.ia-strong {
+  color: var(--text-strong);
+  font-weight: 550;
+}
+.ia-empty {
+  padding: var(--sp-4);
+  text-align: center;
+}
+
+/* Kacheln (Übersicht) */
+.ia-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--sp-3);
+}
+.ia-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+}
+.ia-tile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.ia-tile-head > .lucide {
+  color: var(--accent-strong);
+}
+.ia-tile-value {
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 650;
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+.ia-tile-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* Werkzeugleiste: Suche + Filter */
+.ia-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+.ia-toolbar > select {
+  width: auto;
+}
+.ia-search {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+}
+.ia-search > .lucide {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  color: var(--text-faint);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.ia-search input:not([type='checkbox']) {
+  padding-left: 34px !important; /* gegen die globale input:not(…)-Regel */
+}
+
+/* Tabellen */
+.ia-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.ia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  table-layout: auto;
+}
+.ia-table th,
+.ia-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.ia-table td:first-child {
+  max-width: 280px;
+}
+.ia-table th {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.ia-table tr:last-child td {
+  border-bottom: none;
+}
+.ia-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ia-table td > .truncate {
+  display: block;
+  max-width: 260px;
+}
+.ia-clickable {
+  cursor: pointer;
+}
+.ia-clickable:hover td {
+  background: var(--bg-hover);
+}
+.ia-user-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+}
+.ia-user-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--lh-tight);
+}
+.ia-user-names h3 {
+  margin: 0 0 2px;
+}
+.ia-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+}
+.ia-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+/* Markierungen */
+.ia-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ia-tag-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.ia-tag-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ia-tag-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ia-tag-accent {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* Listen (Einladungen) */
+.ia-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  list-style: none;
+}
+.ia-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ia-row:last-child {
+  border-bottom: none;
+}
+.ia-row-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.ia-row-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--text-strong);
+}
+.ia-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+}
+.ia-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.ia-code {
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: var(--bg-input);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+/* Formulare */
+.ia-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+}
+.ia-created {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.ia-link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.ia-link-row input {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+.ia-settings {
+  max-width: 640px;
+}
+.ia-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.ia-field-label .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+}
+.ia-radio-stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ia-radio-stack legend {
+  float: none;
+  margin-bottom: var(--sp-1);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.ia-radio-stack label {
+  align-items: flex-start;
+}
+.ia-radio-stack input {
+  margin-top: 4px;
+}
+
+/* Nutzerdetail */
+.ia-user-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.ia-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+}
+.ia-facts > div {
+  min-width: 0;
+}
+.ia-facts dt {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+.ia-facts dd {
+  margin: 2px 0 0;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.ia-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ia-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  font-size: var(--fs-sm);
+}
+.ia-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}

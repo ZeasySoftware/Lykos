@@ -1,0 +1,26 @@
+# LiveKit-Konfiguration. API-Keys kommen über LIVEKIT_KEYS aus der Umgebung.
+# Router-Portweiterleitungen auf den Host: UDP 50000-50250, TCP 7881, UDP 3478.
+port: 7880 # Signalisierung (WebSocket) – läuft über den Reverse Proxy
+rtc:
+  tcp_port: 7881 # Fallback, wenn UDP blockiert ist
+  port_range_start: 50000
+  port_range_end: 50200
+  use_external_ip: true # öffentliche IP per STUN ermitteln (Heimanschluss hinter NAT)
+  # Docker-Bridges (172.16.0.0/12) nicht als ICE-Kandidaten anbieten – Clients erreichen sie nie
+  # und probieren sie sonst beim Verbindungsaufbau erst durch.
+  ips:
+    excludes:
+      - 172.16.0.0/12
+turn:
+  enabled: true
+  udp_port: 3478
+  relay_range_start: 50201 # Relay-Ports direkt hinter dem RTC-Bereich -> eine Weiterleitung
+  relay_range_end: 50250
+logging:
+  level: info
+# Voice-Status: LiveKit meldet Beitritte/Austritte/Tracks an den Lykos-Server (Host-Netz -> Port 8080).
+# Der Platzhalter wird von deploy.sh durch LIVEKIT_API_KEY ersetzt (signiert die Webhooks).
+webhook:
+  api_key: __LIVEKIT_API_KEY__
+  urls:
+    - http://127.0.0.1:8080/api/livekit/webhook

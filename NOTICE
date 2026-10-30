@@ -1,0 +1,25 @@
+Lykos – datenschutzfreundliche, selbst gehostete Chat-Plattform (Text, Voice, Dateien, Streams)
+Copyright (C) 2026 Zeasy Software
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along with this program
+(file LICENSE). If not, see <https://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+Hinweis zu Abschnitt 13 AGPL (Netzwerknutzung): Wer eine veränderte Fassung von Lykos als Dienst
+über ein Netzwerk anbietet, muss den Nutzerinnen und Nutzern dieses Dienstes den Quellcode der
+veränderten Fassung anbieten.
+
+Marken: „Lykos“, das Wolfslogo, „Zeasy Software“ und das Zeasy-Logo (client/public/zeasy-logo.svg)
+kennzeichnen das Projekt bzw. seinen Herausgeber. Die AGPL gewährt keine Markenrechte; Forks, die
+öffentlich betrieben oder verteilt werden, sollten einen eigenen Namen und ein eigenes Logo verwenden.
+
+Drittkomponenten und ihre Lizenzen: siehe THIRD_PARTY_NOTICES.md.

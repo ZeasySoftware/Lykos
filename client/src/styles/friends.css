@@ -1,0 +1,250 @@
+/* ---------- Freundesystem: Freundesliste im DM-Bereich, Anfrage per Name, blockierte Nachrichten ---------- */
+
+.friends-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Kopfzeile mit Tabs */
+.friends-header {
+  gap: var(--sp-3);
+}
+.friends-tabs {
+  display: flex;
+  gap: var(--sp-1);
+  min-width: 0;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--border);
+}
+.friends-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.friends-tabs button:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.friends-tabs button.active {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}
+.friends-tabs .mention-badge {
+  margin-left: 0;
+}
+.friends-add-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Inhalt */
+.friends-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-5);
+}
+.friends-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--text-muted);
+}
+.friends-search:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: var(--ring);
+}
+.friends-search input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  outline: none;
+}
+.friends-count {
+  margin: var(--sp-5) 0 var(--sp-2);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.friends-empty {
+  margin-top: var(--sp-6);
+  text-align: center;
+}
+
+/* Einträge */
+.friends-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  transition: background var(--dur-fast) var(--ease);
+}
+.friend-row:hover {
+  background: var(--bg-hover);
+}
+.friend-row:hover + .friend-row,
+.friend-row:hover {
+  border-top-color: transparent;
+}
+.friend-who {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.friend-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.friend-names strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.friend-actions {
+  display: flex;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+.friend-actions .icon-button {
+  border-radius: var(--r-full);
+  background: var(--bg-elevated);
+}
+.friend-actions .icon-button.danger-hover:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.friend-actions .icon-button.ok-hover:hover {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+/* Anfrage per Benutzername */
+.friends-add h2 {
+  margin: 0 0 var(--sp-1);
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+.friends-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+}
+.friends-add-row:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: var(--ring);
+}
+.friends-add-row.ok {
+  border-color: var(--ok);
+}
+.friends-add-row.failed {
+  border-color: var(--danger-border);
+}
+.friends-add-row input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  outline: none;
+}
+.friends-add-ok {
+  margin-top: var(--sp-2);
+  color: var(--ok);
+}
+
+/* Eintrag „Freunde“ oben in der DM-Seitenleiste */
+.dm-friends-entry {
+  margin-bottom: var(--sp-2);
+}
+.dm-friends-entry .channel-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+}
+
+/* Ausgeblendete Nachrichten blockierter Nutzer */
+.blocked-messages {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-1) var(--sp-4);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+.blocked-messages .link-button {
+  font-size: var(--fs-sm);
+}
+
+/* Freundschafts-Aktionen auf der Profilkarte */
+.profile-card-friend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.profile-card-friend .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
+/* Einstellung „Wer darf mir Anfragen schicken?“ – Optionen untereinander */
+.friends-radio-stack {
+  flex-direction: column;
+  align-items: flex-start;
+}

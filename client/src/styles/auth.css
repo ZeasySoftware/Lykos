@@ -1,0 +1,226 @@
+/* ---------- Marke, Anmeldung/Instanzwahl, Download-Seite, Powered by, Update-Banner ---------- */
+
+/* Wortmarke: Logo + „Lykos“ in der Display-Schrift */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-strong);
+  text-decoration: none;
+}
+.wordmark-mark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.wordmark-text {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Nachthimmel: tiefe Basis, violettes Leuchten von oben, sehr dezente Sterne */
+.auth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  min-height: 100%;
+  padding: var(--sp-8) var(--sp-4) var(--sp-6);
+  background:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.35), transparent 60%),
+    radial-gradient(1px 1px at 78% 12%, rgba(255, 255, 255, 0.3), transparent 60%),
+    radial-gradient(1px 1px at 64% 32%, rgba(255, 255, 255, 0.2), transparent 60%),
+    radial-gradient(1px 1px at 28% 72%, rgba(255, 255, 255, 0.18), transparent 60%),
+    radial-gradient(1px 1px at 88% 66%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(900px 560px at 50% -14%, rgba(109, 91, 208, 0.3), transparent 70%),
+    var(--bg-rail);
+}
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 400px;
+  padding: var(--sp-8) 28px 28px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(23, 26, 33, 0.92);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+}
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: var(--sp-1);
+}
+.auth-brand h1 {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-xl);
+}
+.auth-brand p {
+  margin: 0;
+  font-size: 14px;
+}
+.auth-instance {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.auth-instance strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.auth-card > .button.primary {
+  min-height: 40px;
+  margin-top: var(--sp-1);
+}
+.invite-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  text-align: center;
+  font-size: var(--fs-sm);
+}
+.invite-preview strong {
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+}
+.server-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-1);
+}
+.auth-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--sp-2);
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.auth-download:hover,
+.auth-download:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+
+/* ---------- Download-Seite ---------- */
+
+.download-card {
+  max-width: 500px;
+}
+.download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-3);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.download-meta strong {
+  color: var(--text-strong);
+}
+.download-button {
+  min-height: 46px;
+  font-size: var(--fs-md);
+}
+.download-smartscreen {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-color: rgba(232, 180, 76, 0.35);
+  background: var(--warn-soft);
+}
+.download-smartscreen .lucide {
+  margin-top: 2px;
+  color: var(--warn);
+}
+.download-hash {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.download-notes summary {
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.download-notes summary:hover {
+  color: var(--text-strong);
+}
+.download-notes-text {
+  max-height: 240px;
+  margin-top: var(--sp-2);
+  padding: 10px var(--sp-3);
+  overflow-y: auto;
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+}
+
+/* ---------- Powered by Zeasy Software ---------- */
+
+.powered-by {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-decoration: none;
+  opacity: 0.7;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+.powered-by:hover,
+.powered-by:focus-visible {
+  opacity: 1;
+  background: var(--bg-hover);
+}
+.powered-by-logo {
+  width: auto;
+  height: 22px;
+}
+.powered-by-compact {
+  margin-top: var(--sp-1);
+  padding: 4px 6px;
+  font-size: var(--fs-2xs);
+}
+.powered-by-compact .powered-by-logo {
+  height: 16px;
+}

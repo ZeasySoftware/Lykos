@@ -1,0 +1,31 @@
+{#- Grundgerüst aller Lykos-Mails (Textteil, ohne Escaping). Kontext wie `_base.html`. -#}
+{% block heading %}{% endblock %}
+
+
+Hallo {{ username }},
+
+{% block intro %}{% endblock %}
+
+
+{% if code %}
+    {{ code }}
+
+{% endif %}
+{% if action_url %}
+{{ action_label }}:
+{{ action_url }}
+
+{% endif %}
+{% if valid_for %}
+Gültig für {{ valid_for }}{% if valid_note %} · {{ valid_note }}{% endif %}.
+
+{% endif %}
+{% block notice_title %}Warst du das nicht?{% endblock %}
+
+
+{% block notice %}{% endblock %}
+
+
+-- 
+Diese Mail wurde automatisch von {{ instance }} ({{ public_url }}) verschickt – bitte antworte nicht darauf.
+Lykos · Powered by Zeasy Software

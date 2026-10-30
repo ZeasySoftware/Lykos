@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f2348"/>
+      <stop offset="1" stop-color="#4b3a8f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Wolfskopf (Lykos = griech. „Wolf“): Silhouette mit Wangenfell, hellere Stirn-/Schnauzenfacette -->
+  <path fill="#ece9ff" d="M256 150 L210 156 L152 90 L136 200 L98 254 L130 264 L96 312 L140 318 L122 360 L178 354 L214 410 L234 444 L278 444 L298 410 L334 354 L390 360 L372 318 L416 312 L382 264 L414 254 L376 200 L360 90 L302 156 Z"/>
+  <path fill="#c9c2ff" d="M256 150 L302 156 L330 228 L286 300 L270 396 L242 396 L226 300 L182 228 L210 156 Z"/>
+  <path fill="#6d5bd0" d="M162 120 L198 160 L150 190 Z M350 120 L314 160 L362 190 Z"/>
+  <path fill="#1f2348" d="M176 256 L236 280 L204 296 Z M336 256 L276 280 L308 296 Z M230 400 L282 400 L256 426 Z"/>
+</svg>

@@ -1,0 +1,477 @@
+/* ---------- Bedienelemente: Buttons, Formulare, Tabs, Badges, Modal, Popover/Menüs ---------- */
+
+/* Buttons: Standard = sekundär; Varianten primary, ghost, danger (Umriss), danger-solid */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.button:hover:not(:disabled) {
+  background: #2f333d;
+}
+.button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.button.ghost {
+  background: transparent;
+  color: var(--text);
+}
+.button.ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.button.danger {
+  border-color: var(--danger-border);
+  background: transparent;
+  color: var(--danger);
+}
+.button.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+.button.danger-solid {
+  border-color: transparent;
+  background: var(--danger-solid);
+  color: #fff;
+}
+.button.danger-solid:hover:not(:disabled) {
+  background: #d04a45;
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.button.small-button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.icon-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.icon-button[aria-pressed='true'] {
+  color: var(--text-strong);
+}
+.icon-button.small {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+}
+.icon-button.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+a.icon-button {
+  text-decoration: none;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.link-button:hover {
+  color: var(--text-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-button.danger:hover {
+  color: var(--danger);
+}
+
+/* ---------- Formulare ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.form h3 {
+  margin: 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.field > span,
+.field > legend {
+  padding: 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: 550;
+}
+.field em {
+  font-style: normal;
+  font-weight: 400;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='range']),
+select,
+textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--text-strong);
+  outline: none;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+input:not([type='checkbox']):not([type='radio']):hover:not(:disabled):not(:focus),
+select:hover:not(:disabled):not(:focus),
+textarea:hover:not(:disabled):not(:focus) {
+  border-color: var(--border-strong);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-border);
+  box-shadow: var(--ring);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+::placeholder {
+  color: var(--text-faint);
+  opacity: 1;
+}
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] {
+  accent-color: var(--accent);
+}
+input[type='checkbox'],
+input[type='radio'] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+input[type='color'].color-input {
+  width: 48px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  cursor: pointer;
+}
+/* Auswahlfeld mit eigenem Chevron (lucide „chevron-down“, Farbe = --text-muted) */
+select {
+  padding-right: 34px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c92a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  appearance: none;
+  cursor: pointer;
+}
+select option {
+  background: var(--bg-elevated);
+  color: var(--text-strong);
+}
+
+.inline-field,
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 14px;
+}
+.checkbox {
+  cursor: pointer;
+}
+.checkbox.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.inline-field input {
+  width: 90px !important;
+}
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.radio-group legend {
+  float: left;
+  margin-right: var(--sp-2);
+  padding: 0;
+}
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+.form-actions-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-right: auto;
+}
+.copy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ---------- Tabs (Segment-Schalter) ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-input);
+}
+.tabs button {
+  flex: 1 1 0;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+.tabs button:hover {
+  color: var(--text-strong);
+}
+.tabs button.active {
+  background: var(--bg-elevated-2);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Badges ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--sp-2);
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+/* Zähler für Erwähnungen (Kanalliste, Rail, DMs) */
+.mention-badge,
+.rail-mentions {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  background: var(--danger-solid);
+  color: #fff;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+.mention-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.key-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 120px;
+  padding: 7px 12px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-4);
+  background: var(--bg-backdrop);
+  backdrop-filter: blur(3px);
+  animation: fade-in var(--dur) var(--ease);
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 32px);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  animation: pop-in var(--dur) var(--ease);
+}
+.modal-wide {
+  max-width: 800px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 18px 14px 0 var(--sp-6);
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.modal-body {
+  padding: var(--sp-4) var(--sp-6) var(--sp-6);
+  overflow-y: auto;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+/* ---------- Popover & Menüs (gemeinsame Optik) ---------- */
+
+.popover,
+.status-menu,
+.share-menu,
+.emoji-picker,
+.pins-popover,
+.mention-suggestions,
+.profile-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+
+/* Menüeinträge */
+.status-menu button,
+.share-menu button,
+.mention-suggestions button {
+  display: flex;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.status-menu button:hover,
+.share-menu button:hover,
+.mention-suggestions button:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.status-menu button.active,
+.mention-suggestions button.active {
+  background: var(--bg-active);
+  color: var(--text-strong);
+}

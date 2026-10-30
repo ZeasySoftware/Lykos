@@ -1,0 +1,51 @@
+[package]
+name = "lykos-client"
+version = "0.4.1"
+description = "Lykos Desktop-Client"
+authors = ["Zeasy Software"]
+license = "AGPL-3.0-or-later"
+repository = "https://git.zeasy.dev/ZeasyAlex/Lykos"
+edition = "2024"
+rust-version = "1.90"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Eigenständiges Projekt: nicht Teil des Server-Workspaces – auch nicht, wenn das Repo
+# (z. B. als Git-Worktree) unterhalb eines anderen Cargo-Workspaces liegt.
+[workspace]
+
+[lib]
+name = "lykos_client_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+# `tray-icon`: Symbol im Infobereich; `image-png`: Tray-Symbol (mit Ungelesen-Punkt) aus dem App-Icon.
+tauri = { version = "2.12.5", features = ["tray-icon", "image-png"] }
+tauri-plugin-log = "2"
+tauri-plugin-notification = "2.8.0"
+# Session-Token im OS-Schlüsselbund.
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+tauri-plugin-opener = "2.7.2"
+
+# Nur Desktop: globales Push-to-Talk, Auto-Update, Neustart nach dem Update, Einzelinstanz
+# (zweiter Start holt das vorhandene Fenster nach vorn) und „Mit Windows starten“.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2.4.1"
+tauri-plugin-process = "2.4.0"
+tauri-plugin-updater = "2.14.1"
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+
+# Nur Windows: WebView2-Berechtigungen (Mikrofon/Kamera ohne Rückfrage). Versionen wie in Tauri/wry,
+# damit nichts doppelt gebaut wird.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
+# Snap-Layouts der eigenen Titelleiste (Win+Z per `SendInput`).
+windows-sys = { version = "0.61", features = ["Win32_UI_Input_KeyboardAndMouse"] }

@@ -1,0 +1,111 @@
+/*
+ * Design-Tokens – „Nacht“: kühle, wenig gesättigte Dunkelflächen, Violett aus dem Wolfslogo nur als Akzent.
+ * Flächen-Stufen (dunkel → hell): Rail < Seitenleiste < Inhalt < erhöht (Popover, Modal) < erhöht-2.
+ * Kontraste (WCAG AA, auf --bg-content): --text 11:1, --text-muted 5,6:1, --accent-strong 7:1,
+ * weiße Schrift auf --accent 5,1:1, auf --danger-solid 4,8:1.
+ */
+:root {
+  /* Flächen */
+  --bg-rail: #0b0d12;
+  --bg-sidebar: #111319;
+  --bg-content: #171a21;
+  --bg-elevated: #1d2028;
+  --bg-elevated-2: #262a33;
+  --bg-input: #0e1015;
+  /* Zustände als Überlagerung – funktionieren auf jeder Fläche */
+  --bg-hover: rgba(200, 210, 235, 0.055);
+  --bg-active: rgba(200, 210, 235, 0.1);
+  --bg-backdrop: rgba(4, 5, 9, 0.72);
+
+  /* Linien */
+  --border-subtle: rgba(200, 210, 235, 0.06);
+  --border: rgba(200, 210, 235, 0.1);
+  --border-strong: rgba(200, 210, 235, 0.18);
+
+  /* Text */
+  --text-strong: #eef0f5;
+  --text: #c6cad5;
+  --text-muted: #8c92a3;
+  --text-faint: #646a7a;
+
+  /* Akzent (Logo-Violett): Primäraktionen, Auswahl, Fokus */
+  --accent: #6d5bd0;
+  --accent-hover: #7563d8;
+  --accent-strong: #b1a6ff;
+  --accent-soft: rgba(124, 108, 240, 0.14);
+  --accent-soft-hover: rgba(124, 108, 240, 0.22);
+  --accent-border: rgba(150, 134, 255, 0.45);
+  --on-accent: #ffffff;
+  --focus: #a99cff;
+
+  /* Semantik */
+  --ok: #4cc29a;
+  --ok-soft: rgba(76, 194, 154, 0.14);
+  --warn: #e8b44c;
+  --warn-soft: rgba(232, 180, 76, 0.12);
+  --danger: #f0716b;
+  --danger-solid: #c4413c;
+  --danger-soft: rgba(240, 113, 107, 0.13);
+  --danger-border: rgba(240, 113, 107, 0.45);
+  --mention: #e8b44c;
+  --mention-soft: rgba(232, 180, 76, 0.08);
+  --mention-soft-hover: rgba(232, 180, 76, 0.12);
+
+  /* Typografie */
+  --font-sans: 'Inter Variable', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --fs-2xs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 15px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+  --lh-tight: 1.25;
+  --lh: 1.5;
+
+  /* Abstände (4er-Raster) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* Radien */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  --ring: 0 0 0 3px var(--accent-soft-hover);
+
+  /* Bewegung */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+
+  /* Layout */
+  --rail-w: 72px;
+  --sidebar-w: 248px;
+  --members-w: 232px;
+  --search-w: 360px;
+  --header-h: 52px;
+  /* Mobil-Umbruchpunkt: 768px – Media-Queries können keine Variablen nutzen, daher zentral in
+     styles/mobile.css und lib/mobile.ts (MOBILE_MAX_WIDTH). */
+  /* Eigene Titelleiste der Desktop-App (nur mit `html.has-titlebar`, siehe titlebar.css) */
+  --titlebar-h: 32px;
+  --titlebar-button-w: 46px;
+  /* Schließen-Knopf beim Überfahren – wie bei Windows */
+  --window-close-hover: #c42b1c;
+  --window-close-active: #b22a1b;
+}

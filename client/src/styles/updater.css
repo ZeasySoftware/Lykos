@@ -1,0 +1,148 @@
+/* ---------- Start-Splash (Desktop: Update-Prüfung, Laden) ---------- */
+
+.boot-splash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--sp-6);
+  /* Gleiche Grundfarbe wie das native Fenster (tauri.conf.json backgroundColor) – kein Aufblitzen. */
+  background:
+    radial-gradient(circle at 50% 42%, rgba(124, 108, 240, 0.1), transparent 320px),
+    var(--bg-rail);
+  color: var(--text-muted);
+  user-select: none;
+  cursor: default;
+  animation: boot-splash-in 320ms var(--ease) both;
+}
+
+.boot-splash-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+}
+.boot-splash-mark::before {
+  content: '';
+  position: absolute;
+  inset: -18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 108, 240, 0.28), transparent 68%);
+  animation: boot-splash-glow 2.8s ease-in-out infinite;
+}
+.boot-splash-mark > svg {
+  position: relative;
+  width: 76px;
+  height: auto;
+  animation: boot-splash-breathe 2.8s ease-in-out infinite;
+}
+
+.boot-splash-name {
+  margin-top: var(--sp-4);
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.boot-splash-status {
+  min-height: 1.5em;
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.boot-splash-bar {
+  width: 200px;
+  height: 4px;
+  margin-top: var(--sp-4);
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--bg-elevated);
+  transition: opacity var(--dur) var(--ease);
+}
+.boot-splash-bar.is-hidden {
+  opacity: 0;
+}
+.boot-splash-bar > div {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--dur) var(--ease);
+}
+.boot-splash-bar > div.indeterminate {
+  width: 35%;
+  animation: boot-splash-indeterminate 1.4s var(--ease) infinite;
+}
+
+@keyframes boot-splash-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes boot-splash-breathe {
+  50% {
+    transform: scale(1.035);
+  }
+}
+@keyframes boot-splash-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes boot-splash-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash,
+  .boot-splash-mark::before,
+  .boot-splash-mark > svg {
+    animation: none;
+  }
+  /* Statt Lauflicht ein ruhiger, voller Balken. */
+  .boot-splash-bar > div.indeterminate {
+    width: 100%;
+    opacity: 0.4;
+    animation: none;
+  }
+}
+
+/* ---------- Update-Hinweis in der Nutzerleiste ---------- */
+
+.update-indicator.tone-ok {
+  color: var(--ok);
+}
+.update-indicator.tone-ok:hover {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.update-indicator.tone-warn {
+  color: var(--warn);
+}
+.update-indicator.tone-warn:hover {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.update-indicator.tone-muted,
+.update-indicator.tone-muted:hover {
+  color: var(--text-faint);
+}
+.update-indicator[aria-disabled='true'] {
+  cursor: default;
+}
+.update-indicator[aria-disabled='true']:hover {
+  background: transparent;
+}

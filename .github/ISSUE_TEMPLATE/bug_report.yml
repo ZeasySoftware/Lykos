@@ -1,0 +1,67 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie erwartet.
+title: "[Fehler] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Meldung! Bitte vorher nach bestehenden Issues suchen.
+        **Sicherheitslücken bitte nicht hier melden**, sondern wie in `SECURITY.md` beschrieben.
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Was ist passiert?
+      description: Kurze Beschreibung des Fehlers.
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: Schritte zum Nachvollziehen
+      placeholder: |
+        1. Community „…“ öffnen
+        2. Auf „…“ klicken
+        3. Fehler erscheint
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hast du erwartet?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Lykos-Version
+      description: Server- und ggf. Desktop-Version (Einstellungen → Über bzw. `/api/instance`).
+      placeholder: "0.4.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: komponente
+    attributes:
+      label: Betroffener Teil
+      multiple: true
+      options:
+        - Web-Client (Browser)
+        - Desktop-App (Windows)
+        - Server / API
+        - Voice / Video / Screenshare
+        - Deployment / Selbst-Hosting
+        - Sonstiges
+    validations:
+      required: true
+  - type: input
+    id: plattform
+    attributes:
+      label: Plattform
+      description: Betriebssystem, Browser bzw. Docker-Host.
+      placeholder: "Windows 11, Firefox 140 / Debian 13, Docker 28"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, Screenshots
+      description: Server-Log (`docker compose logs server`), Browser-Konsole oder Screenshot. Keine Passwörter, Tokens oder privaten Nachrichten einfügen.
+      render: text

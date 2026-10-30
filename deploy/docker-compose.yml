@@ -1,0 +1,105 @@
+# Lykos – vollständiger Stack (Server + Web-Client, Postgres, LiveKit) für einen einzelnen Docker-Host.
+# Deploy: deploy/deploy.sh (Secrets in /etc/lykos/lykos.env). Lokal: `docker compose up -d --build` mit deploy/.env.
+
+name: lykos
+
+services:
+  postgres:
+    image: postgres:18.6-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lykos
+      POSTGRES_DB: lykos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lykos -d lykos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: ..
+    image: lykos-server:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LYKOS_DATABASE_URL: postgres://lykos:${POSTGRES_PASSWORD}@postgres:5432/lykos
+      LYKOS_PUBLIC_URL: ${LYKOS_PUBLIC_URL:?LYKOS_PUBLIC_URL fehlt}
+      LYKOS_INSTANCE_NAME: ${LYKOS_INSTANCE_NAME:-Lykos}
+      LYKOS_SOURCE_URL: ${LYKOS_SOURCE_URL:-}
+      # Läuft hinter einem Reverse Proxy: Client-IP fürs Rate-Limit aus X-Forwarded-For (ohne Proxy auf false setzen).
+      LYKOS_TRUST_PROXY: ${LYKOS_TRUST_PROXY:-true}
+      # Adresse(n) des Reverse Proxys (IP/CIDR, kommagetrennt): nur dieser darf X-Forwarded-For setzen.
+      LYKOS_TRUSTED_PROXIES: ${LYKOS_TRUSTED_PROXIES:-}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      # Öffentliche Signalisierungs-URL für Clients; die interne API erreicht der Server über das Host-Gateway.
+      LYKOS_LIVEKIT_URL: ${LYKOS_LIVEKIT_URL:-}
+      LYKOS_LIVEKIT_API_URL: ${LYKOS_LIVEKIT_API_URL:-http://host.docker.internal:7880}
+      RUST_LOG: ${RUST_LOG:-lykos_server=info,tower_http=info}
+      LYKOS_MAX_UPLOAD_MB: ${LYKOS_MAX_UPLOAD_MB:-100}
+      LYKOS_USER_QUOTA_MB: ${LYKOS_USER_QUOTA_MB:-2048}
+      # Dateispeicher: local (Volume unten) oder s3.
+      LYKOS_STORAGE: ${LYKOS_STORAGE:-local}
+      LYKOS_S3_ENDPOINT: ${LYKOS_S3_ENDPOINT:-}
+      LYKOS_S3_BUCKET: ${LYKOS_S3_BUCKET:-}
+      LYKOS_S3_REGION: ${LYKOS_S3_REGION:-}
+      LYKOS_S3_ACCESS_KEY_ID: ${LYKOS_S3_ACCESS_KEY_ID:-}
+      LYKOS_S3_SECRET_ACCESS_KEY: ${LYKOS_S3_SECRET_ACCESS_KEY:-}
+      LYKOS_S3_PATH_STYLE: ${LYKOS_S3_PATH_STYLE:-}
+      LYKOS_S3_PREFIX: ${LYKOS_S3_PREFIX:-}
+      # Desktop-Downloads und Update-Manifest (Gitea-Release-API, siehe .env.example).
+      LYKOS_DESKTOP_RELEASES_URL: ${LYKOS_DESKTOP_RELEASES_URL:-}
+      # Feedback als Gitea-Issue weiterleiten (nur per Klick eines Admins); leer = Funktion aus.
+      LYKOS_FEEDBACK_GITEA_URL: ${LYKOS_FEEDBACK_GITEA_URL:-}
+      LYKOS_FEEDBACK_GITEA_TOKEN: ${LYKOS_FEEDBACK_GITEA_TOKEN:-}
+      # Mailversand (E-Mail-Bestätigung, Passwort vergessen, 2FA per E-Mail). Leer = aus.
+      LYKOS_MAIL: ${LYKOS_MAIL:-}
+      LYKOS_MAIL_FROM: ${LYKOS_MAIL_FROM:-}
+      LYKOS_SMTP_HOST: ${LYKOS_SMTP_HOST:-}
+      LYKOS_SMTP_PORT: ${LYKOS_SMTP_PORT:-}
+      LYKOS_SMTP_TLS: ${LYKOS_SMTP_TLS:-}
+      LYKOS_SMTP_USER: ${LYKOS_SMTP_USER:-}
+      LYKOS_SMTP_PASSWORD: ${LYKOS_SMTP_PASSWORD:-}
+      LYKOS_SMTP_URL: ${LYKOS_SMTP_URL:-}
+      # Anmeldung über Discord/GitHub/Google (Presets). Weitere (generische) Anbieter brauchen hier eigene
+      # Zeilen LYKOS_OAUTH_<NAME>_ISSUER/_CLIENT_ID/_CLIENT_SECRET/_LABEL (siehe README).
+      LYKOS_OAUTH_PROVIDERS: ${LYKOS_OAUTH_PROVIDERS:-}
+      LYKOS_OAUTH_DISCORD_CLIENT_ID: ${LYKOS_OAUTH_DISCORD_CLIENT_ID:-}
+      LYKOS_OAUTH_DISCORD_CLIENT_SECRET: ${LYKOS_OAUTH_DISCORD_CLIENT_SECRET:-}
+      LYKOS_OAUTH_DISCORD_SCOPES: ${LYKOS_OAUTH_DISCORD_SCOPES:-}
+      LYKOS_OAUTH_GITHUB_CLIENT_ID: ${LYKOS_OAUTH_GITHUB_CLIENT_ID:-}
+      LYKOS_OAUTH_GITHUB_CLIENT_SECRET: ${LYKOS_OAUTH_GITHUB_CLIENT_SECRET:-}
+      LYKOS_OAUTH_GOOGLE_CLIENT_ID: ${LYKOS_OAUTH_GOOGLE_CLIENT_ID:-}
+      LYKOS_OAUTH_GOOGLE_CLIENT_SECRET: ${LYKOS_OAUTH_GOOGLE_CLIENT_SECRET:-}
+    volumes:
+      # Hochgeladene Dateien (LYKOS_STORAGE_DIR=/app/data/files im Image).
+      - files:/app/data
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # LiveKit läuft im Host-Netz
+
+  # SFU für Voice/Video/Screenshare. Host-Netzwerk, weil WebRTC einen großen
+  # UDP-Portbereich braucht und Docker-NAT dort nur stört.
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    labels:
+      # Bind-Mounts lösen kein Neuerstellen aus; der Hash (gesetzt von deploy.sh) schon.
+      lykos.config-hash: ${LIVEKIT_CONFIG_HASH:-unset}
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+volumes:
+  pgdata:
+  files:

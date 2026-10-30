@@ -1,0 +1,27 @@
+/*
+ * Lykos – Stylesheet-Einstieg. Reihenfolge ist wichtig: Tokens → Grundlagen → Bedienelemente → Bereiche →
+ * Mobil-Layout (mobile.css zuletzt, überschreibt unterhalb von 768 px).
+ * Schriften (Inter, Bricolage Grotesque) werden in main.tsx aus @fontsource eingebunden – selbst gehostet,
+ * also auch offline im Tauri-Bundle verfügbar und ohne Anfragen an Dritte.
+ */
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/controls.css';
+@import './styles/auth.css';
+@import './styles/shell.css';
+@import './styles/messages.css';
+@import './styles/voice.css';
+@import './styles/call.css';
+@import './styles/settings.css';
+@import './styles/updater.css';
+@import './styles/sounds.css';
+@import './styles/feedback.css';
+@import './styles/menus.css';
+@import './styles/customize.css';
+@import './styles/admin.css';
+@import './styles/emoji.css';
+@import './styles/security.css';
+@import './styles/friends.css';
+@import './styles/titlebar.css';
+@import './styles/calls.css';
+@import './styles/mobile.css';

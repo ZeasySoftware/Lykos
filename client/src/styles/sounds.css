@@ -1,0 +1,50 @@
+/* Einstellungen → Sounds */
+
+.sound-volume input[type='range'] {
+  width: 100%;
+  max-width: 320px;
+}
+.sound-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  transition: opacity var(--dur) var(--ease);
+}
+.sound-groups.disabled .checkbox {
+  opacity: 0.5;
+}
+.sound-group h4 {
+  margin: 0 0 var(--sp-1);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sound-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  list-style: none;
+}
+.sound-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 38px;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
+}
+.sound-row + .sound-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.sound-row:hover {
+  background: var(--bg-hover);
+}
+.sound-row .checkbox {
+  flex: 1;
+  min-width: 0;
+}

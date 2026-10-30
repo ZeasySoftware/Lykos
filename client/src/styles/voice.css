@@ -1,0 +1,303 @@
+/* ---------- Voice: Teilnehmer, Voice-Leiste, Signal (Call-Bühne: call.css) ---------- */
+
+.voice-channel + .voice-channel {
+  margin-top: 1px;
+}
+.voice-participants {
+  margin: 2px 0 6px;
+  padding: 0 0 0 26px;
+  list-style: none;
+}
+.voice-participant {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: left;
+}
+.voice-participant:disabled {
+  cursor: default;
+}
+.voice-participant.clickable {
+  cursor: pointer;
+}
+.voice-participant.clickable:hover,
+.voice-participant.watching {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+/* Ring um den Avatar beim Sprechen */
+.voice-avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow var(--dur-fast) var(--ease);
+}
+.voice-avatar .avatar-initial {
+  font-size: 10px;
+}
+.voice-avatar.speaking {
+  box-shadow:
+    0 0 0 2px var(--bg-sidebar),
+    0 0 0 4px var(--ok);
+}
+.voice-name {
+  flex: 1;
+}
+.voice-flag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--fs-xs);
+  opacity: 0.8;
+}
+.voice-flag.camera {
+  color: var(--ok);
+  opacity: 1;
+}
+.voice-flag.deaf,
+.struck {
+  position: relative;
+  display: inline-flex;
+}
+.voice-flag.deaf::after,
+.struck::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 50%;
+  height: 2px;
+  background: var(--danger);
+  transform: rotate(-35deg);
+}
+.live-badge {
+  padding: 0 5px;
+  border-radius: var(--r-xs);
+  background: var(--danger-solid);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+}
+
+/* ---------- Voice-Leiste (über dem Nutzerbereich) ---------- */
+
+.voice-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  row-gap: var(--sp-2);
+  padding: 10px var(--sp-2) var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-rail);
+}
+.voice-panel-error {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+.voice-panel-info {
+  flex: 1;
+  min-width: 0;
+}
+.voice-panel:not(.voice-panel-error) .voice-panel-info {
+  flex-basis: 100%;
+}
+.voice-panel-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+.voice-panel-status.ok {
+  color: var(--ok);
+}
+.voice-panel-inline-error {
+  margin-top: 2px;
+  cursor: pointer;
+}
+.voice-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.voice-panel:not(.voice-panel-error) .voice-panel-actions {
+  flex: 1;
+  justify-content: space-between;
+}
+.voice-panel-actions .icon-button {
+  width: 30px;
+  height: 30px;
+}
+.voice-panel-actions .icon-button.off {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.voice-panel-actions .icon-button.live {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.voice-panel-actions .hangup:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ptt-hint.active {
+  color: var(--ok);
+}
+
+.signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 11px;
+}
+.signal i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--border-strong);
+}
+.signal i:nth-child(1) {
+  height: 4px;
+}
+.signal i:nth-child(2) {
+  height: 7px;
+}
+.signal i:nth-child(3) {
+  height: 11px;
+}
+.signal-3 i {
+  background: var(--ok);
+}
+.signal-2 i:nth-child(-n + 2) {
+  background: var(--warn);
+}
+.signal-1 i:nth-child(1),
+.signal-0 i:nth-child(1) {
+  background: var(--danger);
+}
+
+.voice-share {
+  position: relative;
+}
+.share-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -60px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 6px;
+}
+.share-menu-title {
+  padding: 4px 8px 6px;
+}
+.share-menu button {
+  padding: 6px 8px;
+}
+.share-menu button.active {
+  color: var(--accent-strong);
+}
+
+/* Kamera-Einstellungen */
+.camera-settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.camera-settings-row select {
+  flex: 1;
+  min-width: 0;
+}
+.camera-settings-row .button {
+  white-space: nowrap;
+}
+.camera-preview {
+  position: relative;
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: var(--sp-2);
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: #000;
+}
+.camera-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.camera-preview-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-2);
+  text-align: center;
+}
+
+/* ---------- Einstellungen → Sprache & Video: Pegel, Regler, Tests ---------- */
+
+.voice-range {
+  width: 100%;
+  margin: 0;
+}
+.level-meter {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--bg-input);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.level-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ok);
+  transition: width 60ms linear;
+}
+.level-meter.below .level-meter-fill {
+  background: var(--text-faint);
+}
+.level-meter.idle .level-meter-fill {
+  width: 0 !important;
+}
+.level-meter-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--warn);
+}
+.threshold-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.mic-test-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.mic-test-row .button {
+  white-space: nowrap;
+}

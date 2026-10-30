@@ -1,0 +1,33 @@
+# Rust
+/target
+
+# Client
+client/node_modules
+client/dist
+client/src-tauri/target
+client/src-tauri/gen
+
+# Lokaler Dateispeicher (LYKOS_STORAGE_DIR-Standard)
+/data
+# Desktop-Installer (scripts/release-desktop.ps1)
+dist-desktop/
+
+# Lokale Konfiguration / Secrets
+.env
+deploy/.env
+*.local
+
+# Editor / OS
+.idea
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Werkzeuge (Agent-Worktrees, Browser-Automation)
+.claude/
+.playwright-mcp/
+
+# Signaturschlüssel (Tauri-Updater liegt unter %USERPROFILE%\.tauri\, nie im Repo)
+*.key
+*.key.password

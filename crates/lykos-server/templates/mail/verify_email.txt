@@ -1,0 +1,4 @@
+{% extends "_base.txt" %}
+{% block heading %}Bestätige deine E-Mail-Adresse{% endblock %}
+{% block intro %}bitte bestätige diese Adresse für dein Lykos-Konto auf {{ instance }}. Sie wird nur für die Sicherheit deines Kontos genutzt – etwa für „Passwort vergessen“ und Anmeldecodes.{% endblock %}
+{% block notice %}Dann ignoriere diese Mail einfach. Ohne Klick auf den Link wird die Adresse mit keinem Konto verknüpft.{% endblock %}

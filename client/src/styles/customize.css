@@ -1,0 +1,596 @@
+/*
+ * Gestaltung (Paket J): Community-Icon und -Banner, Profilbanner und Akzentfarben, Einladungskarte,
+ * Systemnachrichten, Profil-Modal und die Einstellungs-Tabs mit Live-Vorschau.
+ * Nutzerfarben kommen als `--custom-accent` (Inline-Style) und werden nur dezent eingesetzt.
+ */
+
+/* ---------- Banner-Flächen ---------- */
+
+.banner-fill {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accent-border), transparent 60%),
+    linear-gradient(120deg, var(--bg-elevated-2), var(--bg-content));
+}
+.banner-fill-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- Community-Icon ---------- */
+
+.community-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+.community-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* In der Community-Leiste füllt das Icon die Kachel. */
+.rail-item .community-icon {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+}
+.rail-item.has-icon,
+.rail-item.has-icon:hover,
+.rail-item.has-icon.active {
+  background: transparent;
+}
+.rail-item.has-icon.active {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+/* Akzentfarbe: nur Auswahl-Pill und Kontur. */
+.rail-item.has-accent.active::before {
+  background: var(--custom-accent);
+}
+.rail-item.has-accent.active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--custom-accent) 55%, transparent);
+}
+.rail-item.has-accent.has-icon.active {
+  outline-color: color-mix(in srgb, var(--custom-accent) 70%, transparent);
+}
+
+/* ---------- Kopf der Kanalleiste ---------- */
+
+.sidebar-header {
+  position: relative;
+}
+.sidebar-banner {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.sidebar-header > :not(.sidebar-banner) {
+  position: relative;
+  z-index: 1;
+}
+.sidebar-header > .community-name {
+  position: static;
+}
+/* Ohne Bild: Verlauf aus der Akzentfarbe, sehr zurückhaltend. */
+.sidebar-header.has-accent .sidebar-banner {
+  opacity: 0.45;
+}
+/* Mit Bild: höherer Kopf, Name unten auf dem Banner, Verlauf für Lesbarkeit. */
+.sidebar-header.has-banner {
+  height: 136px;
+  align-items: flex-end;
+  padding-bottom: 10px;
+  border-bottom-color: transparent;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+.sidebar-header.has-banner .sidebar-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.18) 45%, rgba(11, 13, 18, 0.85) 100%);
+}
+.sidebar-header.has-banner .icon-button {
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+.sidebar-header.has-banner .icon-button:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.community-name {
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.community-name-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+  max-width: 100%;
+  margin-left: -6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-shadow: inherit;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.community-name-button:hover,
+.community-name-button[aria-expanded='true'] {
+  background: var(--bg-hover);
+}
+.sidebar-header.has-banner .community-name-button:hover,
+.sidebar-header.has-banner .community-name-button[aria-expanded='true'] {
+  background: rgba(0, 0, 0, 0.3);
+}
+.community-name-chevron {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: transform var(--dur) var(--ease);
+}
+.community-name-button[aria-expanded='true'] .community-name-chevron {
+  transform: rotate(180deg);
+}
+
+.community-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: var(--sp-2);
+  right: var(--sp-2);
+  z-index: 50;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-shadow: none;
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+.community-popover-banner {
+  height: 72px;
+}
+.community-popover-body {
+  /* Eigene Stapelebene: Das Banner ist positioniert und würde sonst das hochgezogene Icon überdecken. */
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+.community-popover-icon {
+  width: 56px;
+  height: 56px;
+  margin-top: -28px;
+  border-radius: 17px;
+  box-shadow: 0 0 0 4px var(--bg-elevated);
+  font-size: 18px;
+}
+.community-popover-name {
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.community-popover-description {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Einladungskarte ---------- */
+
+.invite-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  text-align: center;
+}
+.invite-card.has-accent {
+  border-color: color-mix(in srgb, var(--custom-accent) 45%, transparent);
+}
+.invite-card-banner {
+  height: 92px;
+}
+.invite-card-body {
+  position: relative; /* über dem positionierten Banner */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 14px 14px;
+  font-size: var(--fs-sm);
+}
+.invite-card-icon {
+  width: 64px;
+  height: 64px;
+  margin-top: -32px;
+  margin-bottom: 6px;
+  border-radius: 20px;
+  box-shadow: 0 0 0 4px var(--bg-elevated);
+  font-size: 20px;
+}
+.invite-card-name {
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  overflow-wrap: anywhere;
+}
+.invite-card-description {
+  margin: 4px 0;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Systemnachrichten ---------- */
+
+.message.system-message {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding-top: 4px;
+  padding-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.system-message-icon {
+  position: absolute;
+  left: 32px;
+  top: 50%;
+  color: var(--ok);
+  transform: translateY(-50%);
+}
+.system-message-text .message-author {
+  display: inline;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.system-message .message-time {
+  font-size: var(--fs-2xs);
+}
+
+/* ---------- Profilkarte und Profil-Modal ---------- */
+
+.profile-card .profile-card-banner {
+  height: 108px;
+}
+.profile-card.has-accent,
+.profile-modal.has-accent {
+  border-color: color-mix(in srgb, var(--custom-accent) 65%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--custom-accent) 20%, var(--bg-elevated)) 0,
+    var(--bg-elevated) 260px
+  );
+}
+.profile-card.has-accent .profile-card-avatar,
+.profile-modal.has-accent .profile-card-avatar {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--custom-accent) 20%, var(--bg-elevated));
+}
+.profile-card.has-accent .profile-card-avatar .avatar-dot,
+.profile-modal.has-accent .profile-card-avatar .avatar-dot {
+  border-color: color-mix(in srgb, var(--custom-accent) 20%, var(--bg-elevated));
+}
+.profile-pronouns {
+  color: var(--text);
+}
+/* Vorschau in den Einstellungen: im Fluss statt als Popover. */
+.profile-card.profile-card-static {
+  position: relative;
+  z-index: auto;
+  width: 100%;
+  animation: none;
+}
+
+.profile-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+.profile-modal-banner {
+  flex-shrink: 0;
+  height: 210px;
+}
+.profile-modal .profile-card-close {
+  top: var(--sp-3);
+  right: var(--sp-3);
+}
+.profile-modal-head {
+  position: relative; /* über dem positionierten Banner */
+  z-index: 1;
+  margin-top: -64px;
+  padding: 0 var(--sp-6);
+}
+.profile-modal-head .profile-card-avatar {
+  box-shadow: 0 0 0 6px var(--bg-elevated);
+}
+.profile-modal-head .avatar-dot {
+  right: 6px;
+  bottom: 6px;
+  width: 20px;
+  height: 20px;
+  border-width: 4px;
+}
+.profile-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-6) var(--sp-6);
+}
+.profile-modal-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.profile-modal-name {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 650;
+  line-height: var(--lh-tight);
+  overflow-wrap: anywhere;
+}
+.profile-modal-names .profile-card-status {
+  margin-top: var(--sp-2);
+}
+.profile-modal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+.profile-modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.profile-modal-col section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-modal-col h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.profile-modal-dates {
+  font-variant-numeric: tabular-nums;
+}
+.mutual-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mutual-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 5px 6px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.mutual-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.mutual-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+/* ---------- Einstellungen: Darstellung mit Live-Vorschau ---------- */
+
+/* Platz für die Live-Vorschau in der Einstellungs-Ebene */
+.settings-content:has(.appearance-layout) {
+  max-width: 1080px;
+}
+.appearance-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--sp-6);
+  align-items: start;
+}
+.appearance-preview {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.appearance-preview h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.appearance-image-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.appearance-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  font-size: 20px;
+}
+.image-picker-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Mini-Ausschnitt aus Leiste und Kanalleiste */
+.preview-shell {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-sidebar);
+}
+.preview-rail {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-3) 0;
+  background: var(--bg-rail);
+}
+.preview-rail .rail-item {
+  cursor: default;
+}
+.preview-sidebar {
+  min-width: 0;
+}
+.preview-sidebar .sidebar-header {
+  pointer-events: none;
+}
+.preview-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--sp-2);
+}
+.preview-channels .channel {
+  cursor: default;
+}
+
+/* Farbauswahl */
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.color-swatch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+.color-swatch:hover {
+  transform: translateY(-1px);
+}
+.color-swatch.none,
+.color-swatch.custom {
+  color: var(--text-muted);
+}
+.color-swatch.custom.selected {
+  color: #fff;
+}
+.color-swatch.selected {
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    0 0 0 4px var(--focus);
+}
+.color-swatch input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.color-swatch:focus-within {
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    0 0 0 4px var(--focus);
+}
+
+@media (max-width: 900px) {
+  .appearance-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .appearance-preview {
+    position: static;
+    max-width: 340px;
+  }
+}
+@media (max-width: 640px) {
+  .profile-modal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .profile-modal-banner {
+    height: 150px;
+  }
+}

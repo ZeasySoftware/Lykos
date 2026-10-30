@@ -1,0 +1,223 @@
+/* ---------- Konto-Sicherheit: Anmeldung (2FA, OIDC, Passwort vergessen) und Einstellungen ---------- */
+
+/* Anmeldung */
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.field-label-row .link-button {
+  font-size: var(--fs-xs);
+}
+.auth-card > .link-button {
+  align-self: center;
+}
+.auth-oidc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.auth-oidc .button {
+  justify-content: center;
+}
+/* Markenlogos der Anmeldedienste (ProviderIcon) nicht stauchen. */
+.provider-icon {
+  flex-shrink: 0;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.mfa-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.mfa-hint .lucide {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-strong);
+}
+.mfa-code-input {
+  font-family: var(--font-mono);
+  font-size: var(--fs-lg);
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+/* Hinweis nach Rückkehr vom Anmeldedienst (angemeldet) */
+.oidc-notice {
+  position: fixed;
+  top: var(--sp-4);
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: min(480px, calc(100vw - 2 * var(--sp-4)));
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+  transform: translateX(-50%);
+  animation: pop-in var(--dur) var(--ease);
+}
+.oidc-notice span {
+  flex: 1;
+  color: var(--text);
+}
+
+/* Einstellungen */
+.security-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  background: var(--bg-hover);
+}
+.security-section h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+}
+.security-section h3 > .lucide {
+  color: var(--text-muted);
+}
+.security-section h3 .badge {
+  margin-left: 0;
+}
+.security-section > p {
+  margin: 0;
+}
+.security-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--sp-1) var(--sp-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.security-facts dt {
+  color: var(--text-muted);
+}
+.security-facts dd {
+  margin: 0;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.security-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.security-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+}
+.security-list li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+.security-list li > .lucide {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.security-list-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.security-list-text strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.security-action {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.security-action > strong {
+  color: var(--text-strong);
+}
+.security-steps {
+  margin: 0;
+  padding-left: var(--sp-5);
+  color: var(--text-muted);
+}
+.reauth-mfa {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* TOTP-Einrichtung */
+.totp-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.totp-qr {
+  flex-shrink: 0;
+  width: 200px;
+  height: 200px;
+  padding: var(--sp-2);
+  border-radius: var(--r-md);
+  /* Der QR-Code braucht hellen Grund, damit Kameras ihn sicher lesen. */
+  background: var(--text-strong);
+}
+.totp-secret {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 180px;
+}
+.totp-secret code {
+  padding: var(--sp-2) 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+/* Wiederherstellungscodes */
+.recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-input);
+  list-style: none;
+}
+.recovery-codes code {
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  letter-spacing: 0.04em;
+}
