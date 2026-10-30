@@ -8,20 +8,55 @@ Patch = Fehlerbehebungen). Migrationen laufen beim Serverstart automatisch.
 
 ## [Unveröffentlicht]
 
+## [0.5.0] – 2026-10-30
+
+Erste öffentliche Version des Quellcodes. Migrationen **0018–0021** (laufen beim Start automatisch).
+
 ### Hinzugefügt
 
-- Lizenz **AGPL-3.0-or-later** (`LICENSE`, `NOTICE`), Lizenzfelder in `Cargo.toml` und `package.json`.
-- `THIRD_PARTY_NOTICES.md` mit geprüften Drittlizenzen.
-- `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), Issue- und PR-Vorlagen für
-  Gitea und GitHub.
-- CI-Workflow für GitHub (`.github/workflows/ci.yml`).
+- **Freundesystem:** Anfragen per Benutzername, Profilkarte oder Kontextmenü; annehmen, ablehnen, zurückziehen,
+  entfernen; **Blockieren** (keine neuen DMs, bestehende 1:1-DM nur lesbar, Nachrichten eingeklappt). Freundesliste
+  im DM-Bereich (Online/Alle/Ausstehend/Blockiert), Einstellung „Wer darf mir Anfragen schicken“. DMs unter Freunden
+  auch ohne gemeinsame Community.
+- **Anrufe in DMs** (1:1 und Gruppe): Anruf- und Video-Knopf, Klingeln mit Annehmen/Ablehnen, Klingel- und Freiton,
+  Desktop-Benachrichtigung, „Anruf verpasst“.
+- **Ton-Einstellungen:** pro Sprachkanal Bitrate (32–256 kbit/s), Stereo, DTX, RED und Nutzerlimit; Mikrofon-
+  Eingangslautstärke bis 200 %, Pegelanzeige, Mikrofontest, Schwelle für Sprachaktivierung, Push-to-Talk-
+  Loslassverzögerung; Ausgabelautstärke, Testton, Lautstärke pro Teilnehmer bis 200 %, eigenes Gerät für
+  Benachrichtigungstöne.
+- **Mobil-Layout** für schmale Fenster (≤ 768 px) und installierbare Web-App (PWA-Manifest).
+- **Desktop:** Schließen in den Infobereich (abschaltbar), Tray-Menü, nur eine laufende Instanz, „Mit Windows
+  starten“, eigene Titelleiste.
+- **HTML-Mails** im Lykos-Design (immer mit Textteil, ohne externe Bilder/Tracker); Hinweis an die alte Adresse,
+  wenn die E-Mail-Adresse geändert wird.
+- Anbieter-Logos an den Anmelde-Buttons, Knopf „Desktop-App installieren“ im Web, Link „Quellcode (AGPL-3.0)“
+  (`LYKOS_SOURCE_URL`).
+- Lizenz **AGPL-3.0-or-later**, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `CONTRIBUTING.md` (DCO), `SECURITY.md`,
+  `CODE_OF_CONDUCT.md`, Issue- und PR-Vorlagen, CI-Workflow für GitHub-Forks.
+
+### Sicherheit
+
+- Content-Security-Policy, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` (und HSTS bei https) für den
+  Web-Client; Gateway nimmt nur Verbindungen der eigenen bzw. erlaubten Origins an.
+- Profile sind nur noch für Freunde und Absender einer an dich gerichteten Anfrage sichtbar (nicht mehr nach eigenem
+  Blockieren oder einer eigenen Anfrage).
+- Anmeldedienst verknüpfen verlangt erneute Anmeldung; Rauswerfen beachtet die Rollenhierarchie; Bearbeiten und
+  Anpinnen nur mit Schreibrecht.
+- Login-Sperre pro Benutzername **und** IP (kein gezieltes Aussperren fremder Konten); Limits für
+  Freundschaftsanfragen, neue DMs und Nachrichten.
+- `LYKOS_TRUSTED_PROXIES`: `X-Forwarded-For` gilt nur noch von den genannten Reverse Proxys.
+- Der eigene Web-Client bekommt das Session-Token nicht mehr im Login-Body (nur HttpOnly-Cookie).
+- Links in Mails tragen Tokens im Fragment (`#token=…`), nicht mehr in der URL-Abfrage; „Passwort vergessen“ ohne
+  Zeitunterschied zwischen bekannten und unbekannten Adressen.
+- Desktop: Zwischenablage wird nicht mehr automatisch lesbar, SmartScreen wieder aktiv.
 
 ### Geändert
 
-- README für Selbst-Hoster neu gegliedert (Docker Compose, Reverse Proxy, LiveKit, Umgebungsvariablen, S3).
-- Gitea-CI wählt den Runner über die Variable `LYKOS_RUNNER` (Standard `ubuntu-latest`), damit sie in Forks läuft.
-- `deploy/deploy.sh` hat kein fest eingetragenes Ziel mehr: Argument oder `LYKOS_DEPLOY_TARGET`.
-- `deploy/.env.example` mit neutralen Beispielwerten (`chat.example.org`).
+- Deutlich schneller bei großen Instanzen: Erwähnungszählung ohne Historien-Scan, neue Indizes, Gateway-Events
+  einmal serialisiert, Präsenz beim Verbinden nur für nicht-offline Nutzer, Kompression (gzip/brotli) und
+  Cache-Header, kleinerer Start-Bundle durch Code-Splitting.
+- README für Selbst-Hoster neu gegliedert; Gitea-CI wählt den Runner über `LYKOS_RUNNER`; `deploy/deploy.sh` ohne
+  fest eingetragenes Ziel.
 
 ## [0.4.1] – 2026-10-29
 
