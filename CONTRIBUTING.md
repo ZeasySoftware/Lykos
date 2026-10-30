@@ -54,11 +54,18 @@ Typen: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `chore`, `ci`. Ein Com
 
 ### Pull Requests
 
-1. Fork anlegen, Branch von `main` (z. B. `feat/gif-suche`).
+1. Fork anlegen, Branch von `main` (z. B. `feat/freundesliste-sortierung`).
 2. Änderungen mit Tests; `CHANGELOG.md` unter „Unveröffentlicht“ ergänzen, wenn Nutzer oder Betreiber etwas davon
    merken.
-3. Lokal alle Prüfungen laufen lassen (fmt, clippy, Tests, Lint, Build) – die CI macht dasselbe.
+3. Lokal alle Prüfungen laufen lassen (fmt, clippy, Tests, Lint, Build). Im öffentlichen Repo auf git.zeasy.dev läuft
+   bewusst **keine** CI – der eigene Build-Runner führt keinen fremden Code aus. In Forks auf GitHub/Gitea laufen die
+   Workflows (siehe unten).
 4. PR-Vorlage ausfüllen; bei UI-Änderungen Screenshots anhängen.
+
+So landet ein Beitrag im Code: Entwickelt wird in einem internen Repo (mit Betriebsnotizen, die nicht öffentlich
+sind); das öffentliche Repo bekommt je Veröffentlichung einen Commit. Angenommene PRs übernehmen die Maintainer dort
+als Patch mit deinem Sign-off, die CI prüft sie, und sie erscheinen mit der nächsten Veröffentlichung – der PR wird
+dann mit Verweis darauf geschlossen und du im `CHANGELOG.md` genannt.
 
 ### Lizenz deiner Beiträge
 
