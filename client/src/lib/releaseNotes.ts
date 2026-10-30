@@ -2,6 +2,8 @@
  * Release-Notizen (Text der Gitea-Releases) für die Download-Seite. Die Notizen nutzen etwas mehr Markdown als
  * Chat-Nachrichten: Überschriften (`#`–`###`), Listen (`-`/`*`) und benannte Links (`[Text](https://…)`).
  * Innerhalb einer Zeile gilt der sichere Chat-Parser (`parseInline`) – es entsteht nie HTML aus dem Text.
+ * Dieselbe Syntax nutzen die Rechtstexte der Instanz (Impressum, Datenschutz); dort bleiben Zeilenumbrüche
+ * innerhalb eines Absatzes erhalten (`keepLineBreaks`), damit Anschriften nicht zu einer Zeile verschmelzen.
  *
  * Beispiel (ausführbar: `npm test`, siehe `releaseNotes.test.ts`):
  *   parseReleaseNotes('## Neu\n- **Freunde**')
@@ -11,7 +13,7 @@
 import { parseInline } from './markdownParser.ts'
 import type { Inline } from './markdownParser.ts'
 
-export type NoteInline = Inline | { type: 'named-link'; url: string; children: Inline[] }
+export type NoteInline = Inline | { type: 'named-link'; url: string; children: Inline[] } | { type: 'break' }
 
 export type NoteBlock =
   | { type: 'heading'; level: 1 | 2 | 3; children: NoteInline[] }
@@ -33,13 +35,18 @@ export function parseNoteInline(text: string): NoteInline[] {
   return out
 }
 
-export function parseReleaseNotes(src: string): NoteBlock[] {
+export function parseReleaseNotes(src: string, { keepLineBreaks = false } = {}): NoteBlock[] {
   const blocks: NoteBlock[] = []
   let paragraph: string[] = []
   let list: NoteInline[][] | null = null
 
   const flush = () => {
-    if (paragraph.length) blocks.push({ type: 'paragraph', children: parseNoteInline(paragraph.join(' ')) })
+    if (paragraph.length) {
+      const children = keepLineBreaks
+        ? paragraph.flatMap((line, i): NoteInline[] => [...(i ? [{ type: 'break' } as const] : []), ...parseNoteInline(line)])
+        : parseNoteInline(paragraph.join(' '))
+      blocks.push({ type: 'paragraph', children })
+    }
     paragraph = []
     if (list) blocks.push({ type: 'list', items: list })
     list = null

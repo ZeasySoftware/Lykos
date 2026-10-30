@@ -152,6 +152,8 @@ Verbindung (der Server warnt beim Start) – wer Port 8080 direkt erreicht, kön
 | `LYKOS_PUBLIC_URL` | `http://localhost:8080` | Öffentliche URL der Instanz |
 | `LYKOS_SOURCE_URL` | `https://github.com/ZeasySoftware/Lykos` | Quellcode der laufenden Fassung, verlinkt als „Quellcode (AGPL-3.0)“. **Wer Lykos verändert betreibt, muss hier seinen eigenen Code angeben** (AGPL §13) |
 | `LYKOS_INSTANCE_NAME` | `Lykos` | Anzeigename |
+| `LYKOS_IMPRINT_FILE` | – | Markdown-Datei mit dem Impressum der Instanz (höchstens 256 KB), angezeigt unter `/impressum` und verlinkt auf Anmeldung, Download-Seite und in den Einstellungen. Gesetzt, aber nicht lesbar = Startfehler. Compose-Stack: Datei nach `/etc/lykos/legal/` legen, Variable `/app/legal/impressum.md` |
+| `LYKOS_PRIVACY_FILE` | – | Wie `LYKOS_IMPRINT_FILE`, für die Datenschutzerklärung (`/datenschutz`) |
 | `LYKOS_WEB_DIR` | – | Verzeichnis des gebauten Web-Clients (im Image gesetzt) |
 | `LYKOS_CORS_ORIGINS` | Tauri-Origins | Kommagetrennte erlaubte Origins (CORS und Gateway-WebSocket; der eigene Origin aus `LYKOS_PUBLIC_URL` ist immer erlaubt) |
 | `LYKOS_TRUST_PROXY` | `false` (Compose: `true`) | Client-IP fürs Login-Rate-Limit aus `X-Forwarded-For`. Ohne `LYKOS_TRUSTED_PROXIES` von jeder Verbindung – nur, wenn Lykos ausschließlich über den Proxy erreichbar ist |

@@ -580,3 +580,11 @@
     display: none;
   }
 }
+
+/* Hinweis „Lieber öffentlich? Issue auf GitHub anlegen“ im Meldeformular */
+.feedback-public a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-strong);
+}

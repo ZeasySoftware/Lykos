@@ -11,6 +11,7 @@ import { listMutes, setChannelMuted, setCommunityMuted, useMutesVersion } from '
 import { toastError } from '../lib/toast'
 import { displayName, useStore } from '../store'
 import { PoweredBy } from './PoweredBy'
+import { LegalLinks } from './LegalLinks'
 import { SourceLink } from './SourceLink'
 import { Avatar } from './Presence'
 import { SettingsLayer, SettingsPage, SettingsSection } from './SettingsLayer'
@@ -100,6 +101,7 @@ export function SettingsDialog({ onClose, initialTab = 'account' }: { onClose: (
           <span className="muted small">Lykos {__APP_VERSION__}</span>
           <span className="muted small">{isDesktopBundle ? 'Desktop-App' : 'Web'}</span>
           <SourceLink />
+          <LegalLinks className="source-link" newTab />
           <PoweredBy compact />
         </div>
       }

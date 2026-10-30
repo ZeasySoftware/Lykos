@@ -188,7 +188,7 @@
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
-/* Release-Notizen: Markdown aus dem Gitea-Release (ReleaseNotes.tsx) */
+/* Release-Notizen: Markdown aus dem Gitea-Release (MarkdownDocument.tsx) */
 .release-notes > :first-child {
   margin-top: 0;
 }
@@ -212,6 +212,65 @@
 }
 .release-notes li + li {
   margin-top: 2px;
+}
+
+/* ---------- Rechtstexte: Impressum, Datenschutzerklärung (LegalPage.tsx) ---------- */
+
+/* Lange Texte: breitere Karte, ruhiger Lesefluss (Zeilenlänge ~ 75 Zeichen). */
+.legal-card {
+  max-width: 720px;
+}
+.legal-brand {
+  margin-bottom: 0;
+}
+.legal-text {
+  color: var(--text);
+  font-size: var(--fs-base);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.legal-text > :first-child {
+  margin-top: 0;
+}
+.legal-text > :last-child {
+  margin-bottom: 0;
+}
+.legal-text h2,
+.legal-text h3,
+.legal-text h4 {
+  color: var(--text-strong);
+  font-weight: 650;
+  line-height: var(--lh-tight);
+}
+.legal-text h2 {
+  margin: var(--sp-8) 0 var(--sp-3);
+  font-size: var(--fs-lg);
+}
+.legal-text h3 {
+  margin: var(--sp-6) 0 var(--sp-2);
+  font-size: var(--fs-md);
+}
+.legal-text h4 {
+  margin: var(--sp-5) 0 var(--sp-1);
+  font-size: inherit; /* so groß wie der Fließtext, nur fett */
+}
+.legal-text p {
+  margin: var(--sp-3) 0;
+}
+.legal-text ul {
+  margin: var(--sp-2) 0 var(--sp-3);
+  padding-left: 1.3em;
+}
+.legal-text li + li {
+  margin-top: var(--sp-1);
+}
+.legal-text .md-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-back {
+  align-self: flex-start;
+  margin-top: var(--sp-2);
 }
 
 /* ---------- Powered by Zeasy Software ---------- */

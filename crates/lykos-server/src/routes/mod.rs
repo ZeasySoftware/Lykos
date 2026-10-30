@@ -20,6 +20,7 @@ pub mod feedback;
 mod health;
 mod instance;
 pub mod invites;
+mod legal;
 mod messages;
 mod oidc;
 mod password_reset;
@@ -39,6 +40,9 @@ pub fn api() -> Router<AppState> {
     Router::new()
         .route("/health", get(health::health))
         .route("/instance", get(instance::instance))
+        // Rechtstexte der Instanz (öffentlich)
+        .route("/legal/imprint", get(legal::imprint))
+        .route("/legal/privacy", get(legal::privacy))
         // Desktop-App: Download-Seite und Update-Manifest (öffentlich)
         .route("/desktop/latest", get(desktop::latest))
         .route("/desktop/latest.json", get(desktop::update_manifest))

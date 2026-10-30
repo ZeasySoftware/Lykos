@@ -64,6 +64,9 @@ pub struct Config {
     pub feedback_gitea: Option<FeedbackGiteaConfig>,
     /// So lange klingelt ein DM-Anruf bei den Angerufenen (Sekunden, fest `DEFAULT_CALL_RING_SECS`).
     pub call_ring_secs: u64,
+    /// Rechtstexte der Instanz (Impressum, Datenschutzerklärung) als Markdown, beim Start eingelesen.
+    /// `LYKOS_IMPRINT_FILE`, `LYKOS_PRIVACY_FILE`.
+    pub legal: LegalTexts,
 }
 
 /// Klingeldauer eines DM-Anrufs, wenn niemand annimmt oder ablehnt.
@@ -428,6 +431,44 @@ impl FeedbackGiteaConfig {
     }
 }
 
+/// Obergrenze für eine Rechtstext-Datei – großzügig für Impressum und Datenschutzerklärung, verhindert
+/// aber, dass eine versehentlich angegebene Riesendatei in den Speicher und in jede Antwort wandert.
+pub const LEGAL_TEXT_MAX_BYTES: u64 = 256 * 1024;
+
+/// Instanz-spezifische Rechtstexte als Markdown (`GET /api/legal/…`). Lykos liefert keine eigenen
+/// Texte mit – Impressum und Datenschutzerklärung sind Sache des Betreibers.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LegalTexts {
+    /// Impressum (`LYKOS_IMPRINT_FILE`); `None` = nicht hinterlegt.
+    pub imprint: Option<String>,
+    /// Datenschutzerklärung (`LYKOS_PRIVACY_FILE`); `None` = nicht hinterlegt.
+    pub privacy: Option<String>,
+}
+
+impl LegalTexts {
+    /// Liest die über `get` benannten Dateien ein. Eine gesetzte, aber fehlende, unlesbare, zu große
+    /// oder nicht UTF-8-kodierte Datei ist ein Startfehler – sonst fiele ein Tippfehler im Pfad erst
+    /// auf, wenn jemand das Impressum vermisst.
+    pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self> {
+        let read = |name: &str| -> Result<Option<String>> {
+            let Some(path) = get(name).map(|v| v.trim().to_owned()).filter(|v| !v.is_empty()) else {
+                return Ok(None);
+            };
+            let size = std::fs::metadata(&path)
+                .with_context(|| format!("{name}: Datei {path:?} nicht lesbar"))?
+                .len();
+            if size > LEGAL_TEXT_MAX_BYTES {
+                anyhow::bail!("{name}: Datei {path:?} ist größer als {} KB", LEGAL_TEXT_MAX_BYTES / 1024);
+            }
+            let text = std::fs::read_to_string(&path)
+                .with_context(|| format!("{name}: Datei {path:?} nicht lesbar (UTF-8 erwartet)"))?;
+            // Leere Datei = kein Text; so kann der Betreiber einen Text abschalten, ohne die Variable zu löschen.
+            Ok(Some(text).filter(|t| !t.trim().is_empty()))
+        };
+        Ok(Self { imprint: read("LYKOS_IMPRINT_FILE")?, privacy: read("LYKOS_PRIVACY_FILE")? })
+    }
+}
+
 /// Zugangsdaten und Adressen des LiveKit-SFU.
 #[derive(Clone)]
 pub struct LiveKitConfig {
@@ -618,6 +659,7 @@ impl Config {
         }
 
         let feedback_gitea = FeedbackGiteaConfig::from_lookup(|name| env::var(name).ok())?;
+        let legal = LegalTexts::from_lookup(|name| env::var(name).ok())?;
 
         Ok(Self {
             bind,
@@ -639,6 +681,7 @@ impl Config {
             oidc_providers: OidcProviderConfig::from_lookup(|name| env::var(name).ok())?,
             call_ring_secs: DEFAULT_CALL_RING_SECS,
             feedback_gitea,
+            legal,
         })
     }
 }
@@ -694,6 +737,7 @@ impl Config {
             oidc_providers: vec![],
             feedback_gitea: None,
             call_ring_secs: DEFAULT_CALL_RING_SECS,
+            legal: LegalTexts::default(),
         }
     }
 
@@ -1005,5 +1049,47 @@ mod tests {
         let mut vars = S3_MIN.to_vec();
         vars.push(("LYKOS_S3_PATH_STYLE", "vielleicht"));
         assert!(backend(&vars).is_err());
+    }
+
+    #[test]
+    fn legal_texts_are_read_from_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let imprint = dir.path().join("impressum.md");
+        std::fs::write(&imprint, "# Impressum\n\nMusterfirma").unwrap();
+        let empty = dir.path().join("leer.md");
+        std::fs::write(&empty, " \n").unwrap();
+        let path = |p: &std::path::Path| p.to_str().unwrap().to_owned();
+
+        let texts = LegalTexts::from_lookup(|name| match name {
+            "LYKOS_IMPRINT_FILE" => Some(path(&imprint)),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(texts.imprint.as_deref(), Some("# Impressum\n\nMusterfirma"));
+        assert_eq!(texts.privacy, None);
+
+        // Leere Variable und leere Datei bedeuten „kein Text“.
+        let texts = LegalTexts::from_lookup(|name| match name {
+            "LYKOS_IMPRINT_FILE" => Some(" ".into()),
+            _ => Some(path(&empty)),
+        })
+        .unwrap();
+        assert_eq!(texts, LegalTexts::default());
+    }
+
+    #[test]
+    fn legal_texts_reject_missing_or_oversized_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("fehlt.md").to_str().unwrap().to_owned();
+        let err = LegalTexts::from_lookup(|name| (name == "LYKOS_PRIVACY_FILE").then(|| missing.clone()))
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("LYKOS_PRIVACY_FILE"), "{err:#}");
+
+        let big = dir.path().join("gross.md");
+        std::fs::write(&big, "x".repeat(LEGAL_TEXT_MAX_BYTES as usize + 1)).unwrap();
+        let big = big.to_str().unwrap().to_owned();
+        let err =
+            LegalTexts::from_lookup(|name| (name == "LYKOS_IMPRINT_FILE").then(|| big.clone())).unwrap_err();
+        assert!(err.to_string().contains("größer als 256 KB"), "{err}");
     }
 }

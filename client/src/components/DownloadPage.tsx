@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Check, Copy, Download, Globe, ShieldAlert } from 'lucide-react'
 import { ApiError, endpoints } from '../lib/api'
-import type { DesktopRelease } from '../lib/api'
+import type { DesktopRelease, LegalAvailability } from '../lib/api'
 import { Wordmark } from './Brand'
-import { ReleaseNotes } from './ReleaseNotes'
+import { LegalLinks } from './LegalLinks'
+import { MarkdownDocument } from './MarkdownDocument'
 import { PoweredBy } from './PoweredBy'
 
 type State = { kind: 'loading' } | { kind: 'ready'; release: DesktopRelease } | { kind: 'error'; text: string }
@@ -11,10 +12,16 @@ type State = { kind: 'loading' } | { kind: 'ready'; release: DesktopRelease } | 
 /** Öffentliche Seite `/download`: Windows-Installer der Desktop-App, ohne Anmeldung erreichbar. */
 export function DownloadPage() {
   const [state, setState] = useState<State>({ kind: 'loading' })
+  // Die Seite läuft ohne Store-Init – welche Rechtstexte es gibt, fragt sie selbst ab.
+  const [legal, setLegal] = useState<LegalAvailability>()
 
   useEffect(() => {
     document.title = 'Lykos herunterladen'
     let cancelled = false
+    endpoints
+      .instance()
+      .then((info) => !cancelled && setLegal(info.legal))
+      .catch(() => {})
     endpoints
       .desktopLatest()
       .then((release) => !cancelled && setState({ kind: 'ready', release }))
@@ -49,6 +56,11 @@ export function DownloadPage() {
           Im Browser nutzen
         </a>
       </div>
+      {legal && (legal.imprint || legal.privacy) && (
+        <div className="auth-links">
+          <LegalLinks className="auth-download" legal={legal} />
+        </div>
+      )}
       <PoweredBy />
     </div>
   )
@@ -88,7 +100,7 @@ function ReleaseInfo({ release }: { release: DesktopRelease }) {
         <details className="download-notes">
           <summary>Was ist neu in {release.version}?</summary>
           <div className="download-notes-text">
-            <ReleaseNotes text={release.notes} />
+            <MarkdownDocument text={release.notes} />
           </div>
         </details>
       )}

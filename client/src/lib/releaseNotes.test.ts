@@ -39,3 +39,12 @@ test('Code und Fettdruck bleiben erhalten', () => {
     { type: 'bold', children: [t('jetzt')] },
   ])
 })
+
+test('Rechtstexte behalten Zeilenumbrüche im Absatz', () => {
+  assert.deepEqual(parseReleaseNotes('Muster GmbH\nHauptstraße 1', { keepLineBreaks: true }), [
+    { type: 'paragraph', children: [t('Muster GmbH'), { type: 'break' }, t('Hauptstraße 1')] },
+  ])
+  assert.deepEqual(parseReleaseNotes('Muster GmbH\nHauptstraße 1'), [
+    { type: 'paragraph', children: [t('Muster GmbH Hauptstraße 1')] },
+  ])
+})

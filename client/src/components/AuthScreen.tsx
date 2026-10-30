@@ -9,6 +9,7 @@ import { extractInviteCode } from '../lib/invite'
 import { useStore } from '../store'
 import { Wordmark } from './Brand'
 import { PoweredBy } from './PoweredBy'
+import { LegalLinks } from './LegalLinks'
 import { SourceLink } from './SourceLink'
 import { ProviderIcon } from './ProviderIcon'
 import { InviteCard } from './customize/CommunityView'
@@ -62,6 +63,7 @@ export function AuthScreen() {
           </a>
         )}
         <SourceLink className="auth-download" />
+        <LegalLinks className="auth-download" />
       </div>
       <PoweredBy />
     </div>

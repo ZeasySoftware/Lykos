@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ClipboardEvent, FormEvent } from 'react'
 import { ApiError, isDesktopBundle } from '../../lib/api'
+import { openExternalLink } from '../../lib/external'
+import { publicIssueUrl } from '../../lib/issues'
 import { collectTechInfo, recentErrors } from '../../lib/diagnostics'
 import type { TechInfo } from '../../lib/diagnostics'
 import { errorText } from '../../lib/errors'
@@ -20,7 +22,7 @@ import { useVoice } from '../../lib/voice'
 import { useStore } from '../../store'
 import { AutoGrowTextarea } from '../AutoGrowTextarea'
 import { KindIcon, TechInfoView } from './FeedbackParts'
-import { CircleCheck, ImagePlus, X } from 'lucide-react'
+import { CircleCheck, ExternalLink, ImagePlus, X } from 'lucide-react'
 
 const KIND_HINTS: Record<FeedbackKind, string> = {
   bug: 'Etwas funktioniert nicht wie erwartet.',
@@ -56,6 +58,7 @@ export function ReportForm({ onShowMine }: { onShowMine: () => void }) {
   const upsertMine = useFeedback((s) => s.upsertMine)
   const area = useCurrentArea()
   const [kind, setKind] = useState<FeedbackKind>(initialKind)
+  const issueUrl = publicIssueUrl(useStore((s) => s.instance?.source_url))
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [attachTech, setAttachTech] = useState(true)
@@ -276,6 +279,15 @@ export function ReportForm({ onShowMine }: { onShowMine: () => void }) {
           <TechInfoView info={techInfo} />
         </details>
       </div>
+
+      {issueUrl && (
+        <p className="feedback-public muted small">
+          Lieber öffentlich? Meldungen hier sehen nur die Admins (Vorschläge alle Nutzer dieser Instanz).{' '}
+          <a href={issueUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => void openExternalLink(e, issueUrl)}>
+            Issue auf GitHub anlegen <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        </p>
+      )}
 
       {error && <p className="error">{error}</p>}
       <div className="form-actions">

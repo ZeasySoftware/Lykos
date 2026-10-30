@@ -39,6 +39,8 @@ if [[ ! -f $ENV_FILE ]]; then
   chmod 600 $ENV_FILE
   echo "Neue $ENV_FILE mit generierten Secrets angelegt."
 fi
+# Ordner für Impressum/Datenschutzerklärung (im Container read-only unter /app/legal, siehe .env.example).
+install -d -m 755 /etc/lykos/legal
 # Neue Variablen aus der Vorlage ergänzen; bestehende Werte bleiben unangetastet.
 while IFS= read -r line; do
   [[ $line =~ ^([A-Z_]+)= ]] || continue

@@ -3,8 +3,17 @@
 
 name: lykos
 
+# Container-Protokolle begrenzen: höchstens 3 × 10 MB je Dienst, ältere Einträge werden überschrieben
+# (Datenschutz – Protokolle sollen nicht unbegrenzt wachsen; Docker rotiert sie sonst nie).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
+    logging: *logging
     image: postgres:18.6-trixie
     restart: unless-stopped
     environment:
@@ -20,6 +29,7 @@ services:
       retries: 10
 
   server:
+    logging: *logging
     build:
       context: ..
     image: lykos-server:latest
@@ -32,6 +42,9 @@ services:
       LYKOS_PUBLIC_URL: ${LYKOS_PUBLIC_URL:?LYKOS_PUBLIC_URL fehlt}
       LYKOS_INSTANCE_NAME: ${LYKOS_INSTANCE_NAME:-Lykos}
       LYKOS_SOURCE_URL: ${LYKOS_SOURCE_URL:-}
+      # Rechtstexte aus /etc/lykos/legal (siehe Volume unten), z. B. /app/legal/impressum.md. Leer = kein Text.
+      LYKOS_IMPRINT_FILE: ${LYKOS_IMPRINT_FILE:-}
+      LYKOS_PRIVACY_FILE: ${LYKOS_PRIVACY_FILE:-}
       # Läuft hinter einem Reverse Proxy: Client-IP fürs Rate-Limit aus X-Forwarded-For (ohne Proxy auf false setzen).
       LYKOS_TRUST_PROXY: ${LYKOS_TRUST_PROXY:-true}
       # Adresse(n) des Reverse Proxys (IP/CIDR, kommagetrennt): nur dieser darf X-Forwarded-For setzen.
@@ -80,6 +93,8 @@ services:
     volumes:
       # Hochgeladene Dateien (LYKOS_STORAGE_DIR=/app/data/files im Image).
       - files:/app/data
+      # Impressum/Datenschutzerklärung des Betreibers (Markdown); der Ordner darf leer sein.
+      - /etc/lykos/legal:/app/legal:ro
     ports:
       - "8080:8080"
     extra_hosts:
@@ -88,6 +103,7 @@ services:
   # SFU für Voice/Video/Screenshare. Host-Netzwerk, weil WebRTC einen großen
   # UDP-Portbereich braucht und Docker-NAT dort nur stört.
   livekit:
+    logging: *logging
     image: livekit/livekit-server:v1.13.11
     restart: unless-stopped
     network_mode: host

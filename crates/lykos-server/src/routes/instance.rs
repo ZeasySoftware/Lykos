@@ -26,6 +26,14 @@ pub struct InstanceInfo {
     oidc_providers: Vec<OidcProviderInfo>,
     /// Quellcode der laufenden Fassung (AGPL-3.0, `LYKOS_SOURCE_URL`).
     source_url: String,
+    /// Welche Rechtstexte hinterlegt sind (`GET /api/legal/imprint` bzw. `/privacy`).
+    legal: LegalInfo,
+}
+
+#[derive(Serialize)]
+pub struct LegalInfo {
+    imprint: bool,
+    privacy: bool,
 }
 
 #[derive(Serialize)]
@@ -57,6 +65,10 @@ pub async fn info(state: &AppState) -> ApiResult<InstanceInfo> {
             .map(|p| OidcProviderInfo { id: p.id.clone(), label: p.label.clone() })
             .collect(),
         source_url: state.config.source_url.clone(),
+        legal: LegalInfo {
+            imprint: state.config.legal.imprint.is_some(),
+            privacy: state.config.legal.privacy.is_some(),
+        },
     })
 }
 

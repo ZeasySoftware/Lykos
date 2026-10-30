@@ -21,7 +21,7 @@ export interface MarkdownOptions {
   jumbo?: boolean
 }
 
-/** Inline-Knoten als React-Elemente (Nachrichten und Release-Notizen, siehe `ReleaseNotes.tsx`). */
+/** Inline-Knoten als React-Elemente (Nachrichten und Release-Notizen, siehe `MarkdownDocument.tsx`). */
 export function renderInline(nodes: Inline[], opts: MarkdownOptions, jumbo = false): ReactNode[] {
   return nodes.map((n, i) => {
     switch (n.type) {

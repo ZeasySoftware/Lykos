@@ -35,8 +35,8 @@ async fn web_client_has_security_headers(db: PgPool) {
     let (config, _dir) = web_config("https://chat.example.org");
     let app = TestApp::with_config(db, config);
 
-    // Startseite, Download-Seite und Einladungen sind SPA-Routen (Fallback auf index.html).
-    for path in ["/", "/download", "/invite/abc123", "/reset-password"] {
+    // Startseite, Download-, Rechtstext-Seiten und Einladungen sind SPA-Routen (Fallback auf index.html).
+    for path in ["/", "/download", "/invite/abc123", "/reset-password", "/impressum", "/datenschutz"] {
         let (status, headers) = get(&app, path).await;
         assert_eq!(status, StatusCode::OK, "{path}");
         let csp = header(&headers, header::CONTENT_SECURITY_POLICY);

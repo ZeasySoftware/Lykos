@@ -20,6 +20,14 @@
     display: none;
   }
 
+  /* Rechtstexte: weniger Rand, damit lange Absätze die Breite des Telefons nutzen. */
+  .legal-card {
+    padding: var(--sp-6) var(--sp-4) var(--sp-5);
+  }
+  .legal-text {
+    font-size: var(--fs-md);
+  }
+
   :root {
     /* Mindestgröße für Touch-Ziele */
     --touch: 44px;

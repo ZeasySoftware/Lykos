@@ -9,6 +9,7 @@ import { FriendsView } from './components/FriendsView'
 import { useFriends } from './lib/friendsStore'
 import { SearchPanel } from './components/SearchPanel'
 import { DownloadPage } from './components/DownloadPage'
+import { LegalPage } from './components/LegalPage'
 import { VerifyEmailPage } from './components/AccountRecoveryPages'
 import { OidcResultNotice } from './components/settings/OidcResultNotice'
 import { Splash } from './components/Splash'
@@ -35,7 +36,7 @@ import { ServerSetup } from './components/ServerSetup'
 import { useIdleDetection } from './lib/presence'
 import { lazyComponent, preloadLazyPanels } from './lib/lazy'
 import { IncomingCalls } from './components/DmCall'
-import type { MessageChannel } from './lib/api'
+import type { LegalKind, MessageChannel } from './lib/api'
 import { Permission } from './lib/permissions'
 import { dmTitle, useStore } from './store'
 import { Menu, Users } from 'lucide-react'
@@ -56,7 +57,15 @@ const downloadRoute = !isDesktopBundle && /^\/download\/?$/.test(location.pathna
 const resetToken = isDesktopBundle ? null : resetTokenFromLocation()
 /** Bestätigungslink aus der Mail (`/verify-email#token=…`) – öffnet sich immer im Browser. */
 const verifyRoute = !isDesktopBundle && /^\/verify-email\/?$/.test(location.pathname)
-const publicRoute = downloadRoute || resetToken !== null || verifyRoute
+/** Rechtstexte der Instanz (`/impressum`, `/datenschutz`) – nur im Web; die Desktop-App öffnet sie im Browser. */
+const legalRoute = isDesktopBundle ? null : legalKindFromPath(location.pathname)
+const publicRoute = downloadRoute || resetToken !== null || verifyRoute || legalRoute !== null
+
+function legalKindFromPath(path: string): LegalKind | null {
+  if (/^\/impressum\/?$/.test(path)) return 'imprint'
+  if (/^\/datenschutz\/?$/.test(path)) return 'privacy'
+  return null
+}
 
 function readMembersOpen(): boolean {
   try {
@@ -91,12 +100,13 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
-    // Öffentliche Seiten (Download, Reset- und Bestätigungslinks) brauchen weder Anmeldung noch Gateway;
+    // Öffentliche Seiten (Download, Rechtstexte, Reset- und Bestätigungslinks) brauchen weder Anmeldung noch Gateway;
     // während der Update-Prüfung noch nicht verbinden (die App startet ggf. gleich neu).
     if (!publicRoute && !booting) void init()
   }, [init, booting])
 
   if (downloadRoute) return <DownloadPage />
+  if (legalRoute) return <LegalPage kind={legalRoute} />
   if (resetToken !== null) return <ResetPasswordPage token={resetToken} />
   if (verifyRoute) return <VerifyEmailPage />
   if (booting) return <Splash state={splash} />

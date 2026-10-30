@@ -213,7 +213,16 @@ export interface InstanceInfo {
   oidc_providers?: OidcProvider[]
   /** Quellcode der laufenden Fassung (AGPL-3.0); ältere Server liefern das Feld nicht. */
   source_url?: string
+  /** Hinterlegte Rechtstexte (`/legal/imprint`, `/legal/privacy`); ältere Server liefern das Feld nicht. */
+  legal?: LegalAvailability
 }
+
+export interface LegalAvailability {
+  imprint: boolean
+  privacy: boolean
+}
+
+export type LegalKind = 'imprint' | 'privacy'
 
 export interface OidcProvider {
   id: string
@@ -608,6 +617,7 @@ export const endpoints = {
   instance: () => api<InstanceInfo>('/instance'),
   /** Neuester Desktop-Installer (öffentlich, Download-Seite). */
   desktopLatest: () => api<DesktopRelease>('/desktop/latest'),
+  legal: (kind: LegalKind) => api<{ content: string }>(`/legal/${kind}`),
 
   register: (body: { username: string; password: string; display_name?: string; invite?: string; email?: string }) =>
     api<AuthResponse>('/auth/register', 'POST', { ...body, session_label: sessionLabel }),
