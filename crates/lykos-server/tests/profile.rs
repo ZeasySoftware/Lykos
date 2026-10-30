@@ -486,7 +486,9 @@ async fn data_export(db: PgPool) {
     assert_eq!(memberships.len(), 1);
     assert_eq!(memberships[0]["community_name"], "Rudel");
     assert_eq!(memberships[0]["nickname"], "Bobby");
-    let messages = export["messages"].as_array().unwrap();
+    // Die Beitrittsmeldung im Systemkanal (leerer Inhalt) zählt Bob ebenfalls als Autor.
+    let messages: Vec<&Value> =
+        export["messages"].as_array().unwrap().iter().filter(|m| m["content"] != "").collect();
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0]["content"], "Hallo Rudel");
     assert_eq!(messages[0]["channel_name"], "allgemein");

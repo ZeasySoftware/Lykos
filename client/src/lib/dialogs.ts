@@ -16,9 +16,20 @@ export type SettingsTab =
   | 'appearance'
   | 'desktop'
   | 'advanced'
+  | 'developer'
 
-export type CommunityTab = 'overview' | 'appearance' | 'emojis' | 'roles' | 'members' | 'invites' | 'audit' | 'danger'
-export type ChannelTab = 'overview' | 'permissions'
+export type CommunityTab =
+  | 'overview'
+  | 'appearance'
+  | 'emojis'
+  | 'roles'
+  | 'members'
+  | 'bans'
+  | 'invites'
+  | 'automod'
+  | 'audit'
+  | 'danger'
+export type ChannelTab = 'overview' | 'permissions' | 'webhooks'
 
 /** Bestätigung einer destruktiven Aktion. Fehler der Aktion werden im Dialog angezeigt. */
 export interface ConfirmSpec {
@@ -34,14 +45,19 @@ export interface ConfirmSpec {
 export type DialogSpec =
   | ({ kind: 'confirm' } & ConfirmSpec)
   | { kind: 'nickname'; communityId: string; userId: string }
+  | { kind: 'ban'; communityId: string; userId: string; name: string }
   | { kind: 'invite'; communityId: string }
-  | { kind: 'createChannel'; communityId: string; channelKind?: ChannelKind }
+  | { kind: 'createChannel'; communityId: string; channelKind?: ChannelKind; categoryId?: string | null }
+  /** Kategorie anlegen (ohne `categoryId`) oder umbenennen. */
+  | { kind: 'category'; communityId: string; categoryId?: string }
   | { kind: 'communitySettings'; communityId: string; tab?: CommunityTab }
   | { kind: 'channelSettings'; communityId: string; channelId: string; tab?: ChannelTab }
   | { kind: 'settings'; tab?: SettingsTab }
   | { kind: 'groupDm'; dmId: string }
   | { kind: 'statusText' }
   | { kind: 'newDm' }
+  | { kind: 'createGroupDm' }
+  | { kind: 'addToDm'; dmId: string }
 
 type Entry = DialogSpec & { id: number }
 

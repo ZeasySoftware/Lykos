@@ -41,6 +41,8 @@ pub struct SettingsView {
     user_quota_mb: Option<u64>,
     allow_community_creation: bool,
     announcement: Option<String>,
+    /// Bot-Konten erlaubt (Anlegen, Hinzufügen, Bot-Tokens).
+    allow_bots: bool,
     /// Werte aus der Umgebung, die bei „Zurücksetzen“ gelten.
     defaults: Defaults,
     /// Schlüssel, die in der Datenbank überschrieben sind.
@@ -60,6 +62,7 @@ async fn view(state: &AppState) -> ApiResult<SettingsView> {
         user_quota_mb: eff.user_quota_bytes.map(|b| b / MB),
         allow_community_creation: eff.allow_community_creation,
         announcement: eff.announcement,
+        allow_bots: eff.allow_bots,
         defaults: Defaults {
             instance_name: state.config.instance_name.clone(),
             max_upload_mb: state.config.max_upload_bytes / MB,
@@ -89,6 +92,8 @@ pub struct UpdateBody {
     allow_community_creation: Option<Option<bool>>,
     #[serde(default, deserialize_with = "double_option")]
     announcement: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    allow_bots: Option<Option<bool>>,
 }
 
 /// Geprüfte Änderungen: Schlüssel → neuer Wert (`None` = Eintrag löschen).
@@ -127,6 +132,9 @@ fn validate(body: UpdateBody) -> ApiResult<Vec<(&'static str, Option<Value>)>> {
     if let Some(text) = body.announcement {
         let text = auth::normalize_text(text, ANNOUNCEMENT_MAX_CHARS, "invalid_announcement")?;
         changes.push((keys::ANNOUNCEMENT, text.map(Value::from)));
+    }
+    if let Some(allow) = body.allow_bots {
+        changes.push((keys::ALLOW_BOTS, allow.map(Value::from)));
     }
     Ok(changes)
 }

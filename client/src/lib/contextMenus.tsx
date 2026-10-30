@@ -34,6 +34,8 @@ import {
   CircleX,
   Eye,
   EyeOff,
+  FolderPlus,
+  ChevronsDownUp,
   Focus,
   Maximize,
   Minimize2,
@@ -44,7 +46,8 @@ import {
   X,
 } from 'lucide-react'
 import { endpoints } from './api'
-import type { Attachment, Channel, DmChannel, Message, PresenceStatus } from './api'
+import type { Attachment, Category, Channel, DmChannel, Message, PresenceStatus } from './api'
+import { isCategoryCollapsed, toggleCategoryCollapsed } from './categoryCollapse'
 import { useAppSettings } from './appSettings'
 import { confirmAction, openDialog } from './dialogs'
 import type { CommunityTab } from './dialogs'
@@ -454,6 +457,15 @@ export function buildUserMenu(o: UserMenuOptions): MenuItem[] {
           },
         }),
     },
+    {
+      type: 'item',
+      id: 'ban',
+      label: `„${name}“ bannen`,
+      icon: <Ban size={ICON} />,
+      danger: true,
+      hidden: !rules.ban,
+      onSelect: () => o.communityId && openDialog({ kind: 'ban', communityId: o.communityId, userId: o.userId, name }),
+    },
     { type: 'separator' },
     {
       type: 'item',
@@ -786,6 +798,15 @@ export function buildCommunityMenu(communityId: string, variant: 'rail' | 'heade
       hidden: !rules.createChannel,
       onSelect: () => openDialog({ kind: 'createChannel', communityId }),
     },
+    {
+      type: 'item',
+      id: 'create-category',
+      label: 'Kategorie erstellen',
+      icon: <FolderPlus size={ICON} />,
+      // Kategorien verwaltet, wer Kanäle verwalten darf.
+      hidden: !rules.createChannel,
+      onSelect: () => openDialog({ kind: 'category', communityId }),
+    },
     { type: 'separator' },
     muteItem({ communityId }, 'Community'),
     { type: 'separator' },
@@ -810,6 +831,79 @@ export function buildCommunityMenu(communityId: string, variant: 'rail' | 'heade
     },
     { type: 'separator' },
     copyIdItem(communityId, 'Community-ID kopieren'),
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// Kanal-Kategorie
+// ---------------------------------------------------------------------------
+
+/** Kategorie löschen – mit Bestätigung; die Kanäle bleiben erhalten. */
+export function deleteCategory(category: Category) {
+  confirmAction({
+    title: 'Kategorie löschen',
+    message: `Willst du die Kategorie „${category.name}“ löschen? Ihre Kanäle bleiben erhalten und stehen danach oben ohne Kategorie.`,
+    confirmLabel: 'Kategorie löschen',
+    action: () => endpoints.deleteCategory(category.id),
+  })
+}
+
+/** Kontextmenü bzw. Zahnrad an einer Kategorie in der Seitenleiste. */
+export function buildCategoryMenu(category: Category): MenuItem[] {
+  const s = useStore.getState()
+  const detail = s.details[category.community_id]
+  if (!detail) return []
+  const isOwner = detail.community.owner_id === s.user?.id
+  const canManage = communityRules(detail.permissions, isOwner).createChannel
+  const communityId = category.community_id
+  const collapsed = isCategoryCollapsed(category.id)
+  return [
+    {
+      type: 'item',
+      id: 'collapse',
+      label: collapsed ? 'Kategorie ausklappen' : 'Kategorie einklappen',
+      icon: <ChevronsDownUp size={ICON} />,
+      onSelect: () => toggleCategoryCollapsed(category.id),
+    },
+    { type: 'separator', hidden: !canManage },
+    {
+      type: 'item',
+      id: 'create-text',
+      label: 'Textkanal hier erstellen',
+      icon: <Plus size={ICON} />,
+      hidden: !canManage,
+      onSelect: () =>
+        openDialog({ kind: 'createChannel', communityId, channelKind: 'text', categoryId: category.id }),
+    },
+    {
+      type: 'item',
+      id: 'create-voice',
+      label: 'Sprachkanal hier erstellen',
+      icon: <Plus size={ICON} />,
+      hidden: !canManage,
+      onSelect: () =>
+        openDialog({ kind: 'createChannel', communityId, channelKind: 'voice', categoryId: category.id }),
+    },
+    { type: 'separator', hidden: !canManage },
+    {
+      type: 'item',
+      id: 'rename',
+      label: 'Kategorie umbenennen',
+      icon: <Pencil size={ICON} />,
+      hidden: !canManage,
+      onSelect: () => openDialog({ kind: 'category', communityId, categoryId: category.id }),
+    },
+    {
+      type: 'item',
+      id: 'delete',
+      label: 'Kategorie löschen',
+      icon: <Trash2 size={ICON} />,
+      danger: true,
+      hidden: !canManage,
+      onSelect: () => deleteCategory(category),
+    },
+    { type: 'separator' },
+    copyIdItem(category.id, 'Kategorie-ID kopieren'),
   ]
 }
 
@@ -842,6 +936,13 @@ export function buildDmMenu(dmId: string, target: HTMLElement): MenuItem[] {
       disabled: !isDmUnread(dm),
       onSelect: () => s.markChannelRead(null, dm.id),
     },
+    {
+      type: 'item',
+      id: 'pin',
+      label: dm.pinned_at ? 'Lösen' : 'Anpinnen',
+      icon: dm.pinned_at ? <PinOff size={ICON} /> : <Pin size={ICON} />,
+      onSelect: () => runAction(() => s.setDmPinned(dm.id, !dm.pinned_at)),
+    },
     { type: 'separator' },
     {
       type: 'item',
@@ -869,6 +970,17 @@ export function buildDmMenu(dmId: string, target: HTMLElement): MenuItem[] {
       icon: <Pencil size={ICON} />,
       hidden: !group,
       onSelect: () => openDialog({ kind: 'groupDm', dmId }),
+    },
+    {
+      type: 'item',
+      id: 'add-people',
+      label: 'Personen hinzufügen',
+      icon: <UserPlus size={ICON} />,
+      // 1:1: nicht bei Blockade oder gelöschtem Gegenüber; Gruppe: solange Platz ist (bis 10).
+      hidden: group
+        ? dm.recipients.length >= 10
+        : !other || useFriends.getState().relationships[other.id]?.type === 'blocked',
+      onSelect: () => openDialog({ kind: 'addToDm', dmId }),
     },
     ...(other ? friendMenuItems(other.id, displayName(other), false) : []),
     { type: 'separator' },

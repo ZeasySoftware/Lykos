@@ -702,3 +702,294 @@ async fn deleting_an_account_cleans_up_dms(db: PgPool) {
         .unwrap();
     assert!(!exists);
 }
+
+// --- Anpinnen, Leute hinzufügen, Gruppen explizit erstellen (Migration 0022) ---
+
+impl World {
+    async fn group(&self, token: &str, recipients: &[&str], name: Option<&str>) -> (StatusCode, Value) {
+        self.app
+            .call(
+                "POST",
+                "/dms",
+                Some(token),
+                Some(json!({ "recipient_ids": recipients, "name": name, "group": true })),
+            )
+            .await
+    }
+
+    async fn add(&self, token: &str, channel: &str, recipients: &[&str]) -> (StatusCode, Value) {
+        self.app
+            .call(
+                "POST",
+                &format!("/dms/{channel}/recipients"),
+                Some(token),
+                Some(json!({ "recipient_ids": recipients })),
+            )
+            .await
+    }
+
+    async fn block(&self, token: &str, user_id: &str) {
+        let (status, body) = self
+            .app
+            .call(
+                "PUT",
+                &format!("/relationships/{user_id}"),
+                Some(token),
+                Some(json!({ "type": "blocked" })),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+}
+
+fn find<'a>(dms: &'a Value, id: &Value) -> &'a Value {
+    dms.as_array().unwrap().iter().find(|d| &d["id"] == id).expect("DM fehlt in der Liste")
+}
+
+#[sqlx::test(migrator = "lykos_server::MIGRATOR")]
+async fn group_flag_creates_groups_with_one_or_no_recipient(db: PgPool) {
+    let w = world(db).await;
+
+    // Ohne Flag bleibt es bei der 1:1-DM.
+    let (status, direct) = w.dm(&w.alex, &[&w.bob_id]).await;
+    assert_eq!((status, s(&direct["kind"])), (StatusCode::CREATED, "dm"));
+
+    // Mit Flag: immer eine neue Gruppe, auch mit nur einer weiteren Person – mit Namen.
+    let (status, group) = w.group(&w.alex, &[&w.bob_id], Some(" Duo ")).await;
+    assert_eq!(status, StatusCode::CREATED, "{group}");
+    assert_eq!((s(&group["kind"]), s(&group["name"])), ("group_dm", "Duo"));
+    assert_eq!(group["recipients"].as_array().unwrap().len(), 2);
+    assert_eq!(group["pinned_at"], Value::Null);
+    let (_, again) = w.group(&w.alex, &[&w.bob_id], None).await;
+    assert_ne!(again["id"], group["id"]);
+    assert_ne!(group["id"], direct["id"]);
+
+    // Ganz allein (Leute kommen später dazu).
+    let (status, alone) = w.group(&w.alex, &[], Some("Später")).await;
+    assert_eq!(status, StatusCode::CREATED, "{alone}");
+    assert_eq!(alone["recipients"].as_array().unwrap().len(), 1);
+    w.send(&w.alex, s(&alone["id"]), "Notiz an mich").await;
+
+    // Erreichbarkeit gilt auch hier.
+    let (status, body) = w.group(&w.alex, &[&w.eve_id], None).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+    // Ohne Flag bleibt eine leere Liste ungültig.
+    let (status, _) = w.dm(&w.alex, &[]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test(migrator = "lykos_server::MIGRATOR")]
+async fn pins_are_personal_and_limited(db: PgPool) {
+    let w = world(db).await;
+    let carl = w.app.invited_user(&w.alex, &w.community, "carl").await;
+    let addr = serve(&w.app).await;
+    let (mut alex_ws, _) = connect(addr, &w.alex).await;
+    let (mut bob_ws, _) = connect(addr, &w.bob).await;
+
+    let (_, dm) = w.dm(&w.alex, &[&w.bob_id]).await;
+    let channel = s(&dm["id"]).to_owned();
+    let pin = format!("/dms/{channel}/pin");
+
+    let (status, pinned) = w.app.call("PUT", &pin, Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::OK, "{pinned}");
+    let at = pinned["pinned_at"].clone();
+    assert!(at.is_string());
+    // Alle eigenen Sitzungen erfahren davon, das Gegenüber nicht.
+    let ev = next_of(&mut alex_ws, "DM_PIN_UPDATE").await;
+    assert_eq!(ev, json!({ "channel_id": channel, "pinned_at": at }));
+    assert_none_of(&mut bob_ws, &["DM_PIN_UPDATE"], Duration::from_millis(300)).await;
+
+    // Eigene Sicht: Bob sieht keinen Pin.
+    let (_, alex_dms) = w.app.call("GET", "/dms", Some(&w.alex), None).await;
+    assert_eq!(find(&alex_dms, &dm["id"])["pinned_at"], at);
+    let (_, bob_dms) = w.app.call("GET", "/dms", Some(&w.bob), None).await;
+    assert_eq!(find(&bob_dms, &dm["id"])["pinned_at"], Value::Null);
+
+    // Erneut anpinnen behält den Zeitpunkt.
+    let (status, again) = w.app.call("PUT", &pin, Some(&w.alex), None).await;
+    assert_eq!((status, &again["pinned_at"]), (StatusCode::OK, &at));
+
+    // Fremde DM: 404.
+    let (status, _) = w.app.call("PUT", &pin, Some(&carl), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = w.app.call("DELETE", &pin, Some(&carl), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) =
+        w.app.call("PUT", &format!("/dms/{}/pin", uuid::Uuid::now_v7()), Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Lösen.
+    let (status, _) = w.app.call("DELETE", &pin, Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let ev = next_of(&mut alex_ws, "DM_PIN_UPDATE").await;
+    assert_eq!(ev, json!({ "channel_id": channel, "pinned_at": null }));
+    let (_, alex_dms) = w.app.call("GET", "/dms", Some(&w.alex), None).await;
+    assert_eq!(find(&alex_dms, &dm["id"])["pinned_at"], Value::Null);
+    let (status, _) = w.app.call("DELETE", &pin, Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // Obergrenze: 20 angepinnte Gruppen (direkt angelegt, am Rate-Limit vorbei), die 21. geht nicht.
+    let alex_id: uuid::Uuid = w.alex_id.parse().unwrap();
+    let mut first = None;
+    for _ in 0..20 {
+        let id = uuid::Uuid::now_v7();
+        sqlx::query("INSERT INTO channels (id, community_id, name, kind) VALUES ($1, NULL, '', 'group_dm')")
+            .bind(id)
+            .execute(&w.app.db)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO dm_recipients (channel_id, user_id, pinned_at) VALUES ($1, $2, now())")
+            .bind(id)
+            .bind(alex_id)
+            .execute(&w.app.db)
+            .await
+            .unwrap();
+        first.get_or_insert(id);
+    }
+    let (status, body) = w.app.call("PUT", &pin, Some(&w.alex), None).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::BAD_REQUEST, "too_many_dm_pins"));
+    // Schon angepinnte bleiben idempotent, nach dem Lösen einer anderen geht es wieder.
+    let first = first.unwrap();
+    let (status, _) = w.app.call("PUT", &format!("/dms/{first}/pin"), Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::OK);
+    w.app.call("DELETE", &format!("/dms/{first}/pin"), Some(&w.alex), None).await;
+    let (status, _) = w.app.call("PUT", &pin, Some(&w.alex), None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Bob ist davon unberührt.
+    let (status, _) = w.app.call("PUT", &pin, Some(&w.bob), None).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[sqlx::test(migrator = "lykos_server::MIGRATOR")]
+async fn adding_to_a_one_to_one_dm_creates_a_group(db: PgPool) {
+    let w = world(db).await;
+    let carl = w.app.invited_user(&w.alex, &w.community, "carl").await;
+    let carl_id = w.app.user_id(&carl).await;
+    let addr = serve(&w.app).await;
+    let (mut bob_ws, _) = connect(addr, &w.bob).await;
+    let (mut carl_ws, _) = connect(addr, &carl).await;
+
+    let (_, direct) = w.dm(&w.alex, &[&w.bob_id]).await;
+    let direct_id = s(&direct["id"]).to_owned();
+    next_of(&mut bob_ws, "DM_CREATE").await;
+    w.send(&w.alex, &direct_id, "privat").await;
+
+    let (status, group) = w.add(&w.alex, &direct_id, &[&carl_id]).await;
+    assert_eq!(status, StatusCode::CREATED, "{group}");
+    assert_eq!(group["kind"], "group_dm");
+    assert_ne!(group["id"], direct["id"]);
+    let names: Vec<&str> =
+        group["recipients"].as_array().unwrap().iter().map(|u| s(&u["username"])).collect();
+    assert_eq!(names, ["alex", "bob", "carl"]);
+    assert_eq!(next_of(&mut bob_ws, "DM_CREATE").await["id"], group["id"]);
+    assert_eq!(next_of(&mut carl_ws, "DM_CREATE").await["id"], group["id"]);
+
+    // Die 1:1-DM bleibt samt Verlauf; der neue Teilnehmer sieht ihn nicht.
+    let (_, dms) = w.app.call("GET", "/dms", Some(&w.alex), None).await;
+    assert_eq!(find(&dms, &direct["id"])["recipients"].as_array().unwrap().len(), 2);
+    let (status, _) = w.app.call("GET", &format!("/channels/{direct_id}/messages"), Some(&carl), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (_, list) =
+        w.app.call("GET", &format!("/channels/{}/messages", s(&group["id"])), Some(&carl), None).await;
+    assert_eq!(list, json!([]));
+
+    // Wer schon drin ist, sich selbst, leere Liste: ungültig.
+    for ids in [vec![w.bob_id.as_str()], vec![w.alex_id.as_str()], vec![]] {
+        let (status, _) = w.add(&w.alex, &direct_id, &ids).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+    // Nicht erreichbar (keine gemeinsame Community) oder unbekannt.
+    let (status, body) = w.add(&w.alex, &direct_id, &[&w.eve_id]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+    // Nicht-Teilnehmer: 404.
+    let (status, _) = w.add(&carl, &direct_id, &[&w.bob_id]).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    // Blockade mit dem Neuen oder mit dem Gegenüber: keine Gruppe.
+    w.block(&carl, &w.alex_id).await;
+    let (status, body) = w.add(&w.alex, &direct_id, &[&carl_id]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+    let dave = w.app.invited_user(&w.alex, &w.community, "dave").await;
+    let dave_id = w.app.user_id(&dave).await;
+    w.block(&w.alex, &w.bob_id).await;
+    let (status, body) = w.add(&w.alex, &direct_id, &[&dave_id]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+}
+
+#[sqlx::test(migrator = "lykos_server::MIGRATOR")]
+async fn adding_to_a_group_extends_it(db: PgPool) {
+    let w = world(db).await;
+    let carl = w.app.invited_user(&w.alex, &w.community, "carl").await;
+    let carl_id = w.app.user_id(&carl).await;
+    let dave = w.app.invited_user(&w.alex, &w.community, "dave").await;
+    let addr = serve(&w.app).await;
+    let (mut bob_ws, _) = connect(addr, &w.bob).await;
+    let (mut carl_ws, _) = connect(addr, &carl).await;
+
+    let (_, group) = w.group(&w.alex, &[&w.bob_id], Some("Runde")).await;
+    let channel = s(&group["id"]).to_owned();
+    next_of(&mut bob_ws, "DM_CREATE").await;
+    let before = w.send(&w.alex, &channel, "vorher").await;
+    let (_, _) = w.app.call("PUT", &format!("/dms/{channel}/pin"), Some(&w.bob), None).await;
+
+    // Bob (nicht der Ersteller) fügt Carl hinzu.
+    let (status, updated) = w.add(&w.bob, &channel, &[&carl_id, &carl_id]).await;
+    assert_eq!(status, StatusCode::OK, "{updated}");
+    assert_eq!(updated["id"], group["id"]);
+    assert_eq!(updated["recipients"].as_array().unwrap().len(), 3);
+    // Eigene Sicht in der Antwort (Bobs Pin), geteilte Events ohne.
+    assert!(updated["pinned_at"].is_string());
+
+    // Carl bekommt die Gruppe, die anderen ein Update; alle die Systemnachricht.
+    let created = next_of(&mut carl_ws, "DM_CREATE").await;
+    assert_eq!((&created["id"], &created["pinned_at"]), (&group["id"], &Value::Null));
+    assert_eq!(created["name"], "Runde");
+    let update = next_of(&mut bob_ws, "DM_UPDATE").await;
+    assert_eq!(update["recipients"].as_array().unwrap().len(), 3);
+    assert_eq!(update["pinned_at"], Value::Null);
+    let sys = next_of(&mut carl_ws, "MESSAGE_CREATE").await;
+    assert_eq!((s(&sys["kind"]), s(&sys["content"])), ("recipient_add", ""));
+    assert_eq!(sys["author"]["id"], w.bob_id.as_str());
+    assert_eq!(sys["mentions"], json!([carl_id]));
+    assert_eq!(next_of(&mut bob_ws, "MESSAGE_CREATE").await["id"], sys["id"]);
+    assert_none_of(&mut carl_ws, &["DM_UPDATE"], Duration::from_millis(300)).await;
+
+    // Carl sieht den Verlauf und kann schreiben; Systemnachrichten lassen sich nicht bearbeiten.
+    let (_, list) = w.app.call("GET", &format!("/channels/{channel}/messages"), Some(&carl), None).await;
+    let ids: Vec<&str> = list.as_array().unwrap().iter().map(|m| s(&m["id"])).collect();
+    assert!(ids.contains(&s(&before["id"])));
+    w.send(&carl, &channel, "hallo zusammen").await;
+    let (status, _) = w
+        .app
+        .call("PATCH", &format!("/messages/{}", s(&sys["id"])), Some(&w.bob), Some(json!({ "content": "x" })))
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // Doppelt hinzufügen geht nicht; Nicht-Teilnehmer bekommen 404; Unerreichbare 403.
+    let (status, _) = w.add(&w.alex, &channel, &[&carl_id]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = w.add(&dave, &channel, &[&w.eve_id]).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body) = w.add(&w.alex, &channel, &[&w.eve_id]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+    // Blockade zwischen Hinzufügendem und Neuem.
+    let dave_id = w.app.user_id(&dave).await;
+    w.block(&dave, &w.alex_id).await;
+    let (status, body) = w.add(&w.alex, &channel, &[&dave_id]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::FORBIDDEN, "dm_not_allowed"));
+
+    // Limit: 3 + 7 = 10 geht, eine Person mehr nicht.
+    let mut ids = Vec::new();
+    for i in 0..8 {
+        let t = w.app.invited_user(&w.alex, &w.community, &format!("user{i}")).await;
+        ids.push(w.app.user_id(&t).await);
+    }
+    let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let (status, body) = w.add(&w.alex, &channel, &refs).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::BAD_REQUEST, "too_many_recipients"));
+    let (status, full) = w.add(&w.alex, &channel, &refs[..7]).await;
+    assert_eq!(status, StatusCode::OK, "{full}");
+    assert_eq!(full["recipients"].as_array().unwrap().len(), 10);
+    let (status, body) = w.add(&w.alex, &channel, &refs[7..]).await;
+    assert_eq!((status, s(&body["error"])), (StatusCode::BAD_REQUEST, "too_many_recipients"));
+}

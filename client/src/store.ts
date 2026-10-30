@@ -25,11 +25,14 @@ import { isSoundSyncing, markSoundSync, playMessageSound, playSound } from './li
 import { loadChosenStatus, saveChosenStatus } from './lib/presence'
 import { isNewer } from './lib/unread'
 import { plainText } from './lib/markdownParser'
+import { alertSummary, parseAlert } from './lib/automod'
 import { reactionKey } from './lib/customEmoji'
 import { applyEmojisUpdate } from './lib/emojiData'
+import { knowsCategory, upsertCategory } from './lib/categories'
 import { useFeedback } from './lib/feedbackStore'
 import { isBlocked, useFriends } from './lib/friendsStore'
 import { incomingCount } from './lib/friends'
+import { joinNames } from './lib/dmList'
 import { createRefreshBatch } from './lib/refreshBatch'
 import { setCallUser, useCalls } from './lib/callStore'
 
@@ -96,7 +99,16 @@ interface State {
   selectDm: (channelId: string) => void
   /** DM mit diesen Nutzern öffnen (1:1 wird wiederverwendet) und anzeigen. */
   openDm: (recipientIds: string[], name?: string) => Promise<void>
-  /** DM lokal übernehmen (z. B. nach Umbenennen). */
+  /** Neue Gruppe anlegen (auch mit einer oder keiner weiteren Person) und anzeigen. */
+  createGroupDm: (recipientIds: string[], name?: string) => Promise<void>
+  /**
+   * Leute zu einer Unterhaltung hinzufügen und die Unterhaltung anzeigen, in der sie jetzt sind: dieselbe Gruppe
+   * bzw. bei einer 1:1-DM die neu entstandene Gruppe.
+   */
+  addToDm: (channelId: string, recipientIds: string[]) => Promise<void>
+  /** Unterhaltung für sich anpinnen bzw. lösen. */
+  setDmPinned: (channelId: string, pinned: boolean) => Promise<void>
+  /** DM lokal übernehmen (z. B. nach Umbenennen). Der eigene Pin bleibt, außer die DM ist neu. */
   upsertDm: (dm: DmChannel) => void
   leaveDm: (channelId: string) => Promise<void>
   /** Zum Kanal einer Nachricht wechseln und die Nachrichten um sie herum laden. */
@@ -138,6 +150,8 @@ interface State {
   toggleReaction: (message: Message, emoji: string) => Promise<void>
 
   createCommunity: (name: string) => Promise<void>
+  /** Community aus einer Discord-Servervorlage anlegen und hineinwechseln. */
+  createCommunityFromTemplate: (code: string, name: string) => Promise<void>
   acceptInvite: (code: string) => Promise<void>
   clearPendingInvite: () => void
   updateCommunity: (community: Community) => void
@@ -282,8 +296,21 @@ function upsertMessage(list: Message[], msg: Message): Message[] {
 export function dmTitle(dm: DmChannel, meId: string | undefined): string {
   if (dm.name) return dm.name
   const others = dm.recipients.filter((u) => u.id !== meId)
-  if (others.length === 0) return dm.kind === 'dm' ? 'Gelöschter Nutzer' : 'Nur du'
+  if (others.length === 0) return dm.kind === 'dm' ? 'Gelöschter Nutzer' : 'Neue Gruppe'
   return others.map((u) => displayName(u)).join(', ')
+}
+
+/**
+ * Text der Systemnachricht `recipient_add` (ohne den Autor davor): „hat dich zur Gruppe hinzugefügt.“ bzw.
+ * „hat Anna und Bert zur Gruppe hinzugefügt.“ Wer die Gruppe inzwischen verlassen hat, erscheint als „jemanden“.
+ */
+export function recipientAddText(msg: Message, dm: DmChannel | undefined, meId: string | undefined): string {
+  const names = (msg.mentions ?? []).map((id) => {
+    if (id === meId) return 'dich'
+    const u = dm?.recipients.find((r) => r.id === id)
+    return u ? displayName(u) : 'jemanden'
+  })
+  return `hat ${joinNames(names.length > 0 ? names : ['jemanden'])} zur Gruppe hinzugefügt.`
 }
 
 /** Anzeige eines Kanals in Texten: `#name` bei Textkanälen, sonst der Name der DM. */
@@ -468,9 +495,15 @@ export const useStore = create<State>()((set, get) => {
       const channel = detail?.channels.find((c) => c.id === msg.channel_id)
       const where = channel ? ` in #${channel.name}` : ''
       const nickname = memberOf(s.members[msg.community_id], msg.author?.id)?.nickname
-      const who = nickname || displayName(msg.author)
-      const title = mentioned ? `${who} hat dich erwähnt${where}` : `${who}${where}`
-      const body = msg.kind === 'member_join' ? 'ist beigetreten.' : plainText(msg.content).slice(0, 200)
+      const who = nickname || senderName(msg)
+      const alert = msg.kind === 'automod_alert' ? parseAlert(msg.content) : null
+      const title = alert ? `AutoMod${where}` : mentioned ? `${who} hat dich erwähnt${where}` : `${who}${where}`
+      const body =
+        msg.kind === 'member_join'
+          ? 'ist beigetreten.'
+          : alert
+            ? `${alertSummary(alert)}: ${who} · ${alert.rule_name}`
+            : plainText(msg.content).slice(0, 200)
       void notify(title, body)
     }
   }
@@ -493,8 +526,13 @@ export const useStore = create<State>()((set, get) => {
     const wanted = (mentioned || !isChannelMuted(msg.channel_id)) && !isBlocked(msg.author?.id)
     if (!own && wanted && !document.hasFocus() && effectiveStatus(s) !== 'dnd') {
       const where = dm?.kind === 'group_dm' ? ` in ${dmTitle(dm, s.user?.id)}` : ''
-      const body = msg.kind === 'call_missed' ? 'Verpasster Anruf' : plainText(msg.content).slice(0, 200)
-      void notify(`${displayName(msg.author)}${where}`, body)
+      const body =
+        msg.kind === 'call_missed'
+          ? 'Verpasster Anruf'
+          : msg.kind === 'recipient_add'
+            ? recipientAddText(msg, dm, s.user?.id)
+            : plainText(msg.content).slice(0, 200)
+      void notify(`${senderName(msg)}${where}`, body)
     }
   }
 
@@ -532,7 +570,13 @@ export const useStore = create<State>()((set, get) => {
   /** Profiländerung überall übernehmen: eigenes Konto, Mitgliederlisten, Autoren geladener Nachrichten. */
   function applyUserUpdate(p: UserProfile) {
     set((s) => {
-      const pub: UserPublic = { id: p.id, username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+      const pub: UserPublic = {
+        id: p.id,
+        username: p.username,
+        display_name: p.display_name,
+        avatar_url: p.avatar_url,
+        ...(p.bot ? { bot: true } : {}),
+      }
       const members: Record<string, Member[]> = {}
       for (const [cid, list] of Object.entries(s.members)) {
         members[cid] = list.some((m) => m.user.id === p.id)
@@ -712,6 +756,11 @@ export const useStore = create<State>()((set, get) => {
       case 'CHANNEL_UPDATE': {
         const detail = s.details[ev.d.community_id]
         if (!detail) break
+        // In eine Kategorie verschoben, die dieser Client noch nicht kennt (war für ihn unsichtbar)?
+        if (!knowsCategory(detail.categories, ev.d.category_id)) {
+          void s.loadDetail(ev.d.community_id)
+          break
+        }
         set({
           details: {
             ...s.details,
@@ -736,6 +785,29 @@ export const useStore = create<State>()((set, get) => {
             voiceStates: { ...get().voiceStates, [ev.d.community_id]: voice.filter((v) => v.channel_id !== ev.d.id) },
           })
         }
+        break
+      }
+      case 'CATEGORY_CREATE':
+      case 'CATEGORY_UPDATE': {
+        const detail = s.details[ev.d.community_id]
+        if (!detail) break
+        set({
+          details: {
+            ...s.details,
+            [ev.d.community_id]: { ...detail, categories: upsertCategory(detail.categories, ev.d) },
+          },
+        })
+        break
+      }
+      case 'CATEGORY_DELETE': {
+        const detail = s.details[ev.d.community_id]
+        if (!detail) break
+        const next = {
+          ...detail,
+          categories: (detail.categories ?? []).filter((c) => c.id !== ev.d.id),
+          channels: detail.channels.map((c) => (c.category_id === ev.d.id ? { ...c, category_id: null } : c)),
+        }
+        set({ details: { ...s.details, [ev.d.community_id]: next } })
         break
       }
       case 'COMMUNITY_UPDATE':
@@ -865,6 +937,9 @@ export const useStore = create<State>()((set, get) => {
       case 'DM_DELETE':
         removeDm(ev.d.id)
         break
+      case 'DM_PIN_UPDATE':
+        applyDmPin(ev.d.channel_id, ev.d.pinned_at)
+        break
       case 'EMOJIS_UPDATE':
         applyEmojisUpdate(ev.d)
         break
@@ -899,6 +974,15 @@ export const useStore = create<State>()((set, get) => {
     if (effectiveStatus(s) === 'dnd' || isSoundSyncing()) return
     playSound('friendRequest')
     if (!document.hasFocus()) void notify('Neue Freundschaftsanfrage', `${displayName(from)} möchte mit dir befreundet sein.`)
+  }
+
+  /** Eigenen Pin einer DM übernehmen (Antwort auf Anpinnen/Lösen oder `DM_PIN_UPDATE` von einem anderen Gerät). */
+  function applyDmPin(id: string, pinnedAt: string | null) {
+    set((s) => {
+      const dm = s.dms[id]
+      if (!dm || (dm.pinned_at ?? null) === pinnedAt) return {}
+      return { dms: { ...s.dms, [id]: { ...dm, pinned_at: pinnedAt } } }
+    })
   }
 
   function removeDm(id: string) {
@@ -1166,6 +1250,17 @@ export const useStore = create<State>()((set, get) => {
       }
     },
 
+    async createCommunityFromTemplate(code, name) {
+      const detail = await endpoints.createCommunityFromTemplate(code, name)
+      set((s) => ({
+        communities: s.communities.some((c) => c.id === detail.community.id)
+          ? s.communities
+          : [...s.communities, detail.community],
+        details: { ...s.details, [detail.community.id]: detail },
+      }))
+      get().selectCommunity(detail.community.id)
+    },
+
     async createCommunity(name) {
       const detail = await endpoints.createCommunity(name)
       set((s) => ({
@@ -1322,6 +1417,26 @@ export const useStore = create<State>()((set, get) => {
       get().selectDm(dm.id)
     },
 
+    async createGroupDm(recipientIds, name) {
+      const dm = await endpoints.createGroupDm(recipientIds, name)
+      get().upsertDm(dm)
+      get().selectDm(dm.id)
+    },
+
+    async addToDm(channelId, recipientIds) {
+      const dm = await endpoints.addDmRecipients(channelId, recipientIds)
+      get().upsertDm(dm)
+      get().selectDm(dm.id)
+    },
+
+    async setDmPinned(channelId, pinned) {
+      // Die Antwort (bzw. `DM_PIN_UPDATE`) setzt den Stand; ohne optimistisches Umsortieren springt nichts zurück.
+      let pinnedAt: string | null = null
+      if (pinned) pinnedAt = (await endpoints.pinDm(channelId)).pinned_at ?? null
+      else await endpoints.unpinDm(channelId)
+      applyDmPin(channelId, pinnedAt)
+    },
+
     upsertDm(dm) {
       set((s) => {
         const prev = s.dms[dm.id]
@@ -1332,10 +1447,18 @@ export const useStore = create<State>()((set, get) => {
           prev?.last_message_id && isNewer(prev.last_message_id, dm.last_message_id ?? undefined)
             ? prev.last_message_id
             : dm.last_message_id
+        // Events tragen auch den eigenen Pin nicht; er ändert sich nur über `DM_PIN_UPDATE` bzw. `setDmPinned`.
+        const pinnedAt = prev ? (prev.pinned_at ?? null) : (dm.pinned_at ?? null)
         return {
           dms: {
             ...s.dms,
-            [dm.id]: { ...dm, last_read_message_id: lastRead, last_message_id: last, mention_count: mentionCount },
+            [dm.id]: {
+              ...dm,
+              last_read_message_id: lastRead,
+              last_message_id: last,
+              mention_count: mentionCount,
+              pinned_at: pinnedAt,
+            },
           },
         }
       })
@@ -1452,6 +1575,11 @@ export const useStore = create<State>()((set, get) => {
 export function displayName(u: { username: string; display_name: string | null } | null): string {
   if (!u) return 'Gelöschter Nutzer'
   return u.display_name || u.username
+}
+
+/** Absender einer Nachricht: Name des Webhooks oder Anzeigename des Autors. */
+export function senderName(m: Pick<Message, 'author' | 'webhook'>): string {
+  return m.webhook?.name ?? displayName(m.author)
 }
 
 /** Name eines Mitglieds in seiner Community: Nickname > Anzeigename > Benutzername. */

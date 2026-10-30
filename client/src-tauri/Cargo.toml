@@ -1,6 +1,6 @@
 [package]
 name = "lykos-client"
-version = "0.5.1"
+version = "0.6.0"
 description = "Lykos Desktop-Client"
 authors = ["Zeasy Software"]
 license = "AGPL-3.0-or-later"

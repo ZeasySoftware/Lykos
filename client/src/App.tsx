@@ -35,6 +35,7 @@ import { ProfileCard } from './components/ProfileCard'
 import { ProfileModalHost } from './components/customize/ProfileView'
 import { ServerSetup } from './components/ServerSetup'
 import { useIdleDetection } from './lib/presence'
+import { useAfkMove } from './lib/afkWatcher'
 import { lazyComponent, preloadLazyPanels } from './lib/lazy'
 import { IncomingCalls } from './components/DmCall'
 import type { LegalKind, MessageChannel } from './lib/api'
@@ -193,6 +194,7 @@ function Shell() {
   useEscapeLayer(drawerOpen, closeDrawer)
   // Präsenz: nach 10 min ohne Eingabe automatisch abwesend.
   useIdleDetection(useStore((s) => s.setAutoIdle))
+  useAfkMove()
   // Strg+, öffnet die Einstellungen (wie bei Discord).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -287,6 +287,18 @@
 .system-message .message-time {
   font-size: var(--fs-2xs);
 }
+/* Eigener Willkommenstext der Community: Markdown wie normale Nachrichten, in Textfarbe. */
+.system-message-custom {
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.system-message-custom > :first-child {
+  margin-top: 0;
+}
+.system-message-custom > :last-child {
+  margin-bottom: 0;
+}
 
 /* ---------- Profilkarte und Profil-Modal ---------- */
 
@@ -472,6 +484,23 @@
   font-weight: 650;
   letter-spacing: 0.07em;
   text-transform: uppercase;
+}
+/* Vorschau der Beitrittsmeldung (Systemkanal) */
+.welcome-preview {
+  padding: var(--sp-2) 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-content);
+}
+.welcome-preview h5 {
+  margin: 0 var(--sp-3);
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+}
+.welcome-preview .message.system-message {
+  position: relative;
+  margin-top: var(--sp-1);
 }
 .appearance-image-row {
   display: flex;

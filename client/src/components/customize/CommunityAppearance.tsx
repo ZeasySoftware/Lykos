@@ -1,19 +1,24 @@
 /**
  * Community-Einstellungen, Tab „Darstellung“ (Recht MANAGE_COMMUNITY): Icon, Banner, Beschreibung,
- * Akzentfarbe und Systemkanal – mit Live-Vorschau von Community-Leiste, Kanalleisten-Kopf und Einladung.
+ * Akzentfarbe, Systemkanal und Willkommensnachricht – mit Live-Vorschau von Community-Leiste,
+ * Kanalleisten-Kopf, Einladung und Beitrittsmeldung.
  */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useUnsavedChanges } from '../../lib/unsaved'
 import type { FormEvent } from 'react'
 import { endpoints, uploadCommunityImage } from '../../lib/api'
-import type { Community, CommunityDetail } from '../../lib/api'
+import type { Community, CommunityDetail, Member, User } from '../../lib/api'
 import { IMAGE_FORMATS, accentStyle, prepareImage, sidebarHeaderClass } from '../../lib/customize'
 import { errorText } from '../../lib/errors'
-import { useStore } from '../../store'
+import { Markdown } from '../../lib/markdown'
+import { mentionResolver } from '../../lib/mentions'
+import { WELCOME_MAX, WELCOME_PLACEHOLDERS, renderWelcome } from '../../lib/welcome'
+import { displayName, useStore } from '../../store'
+import { SwitchRow } from '../Switch'
 import { InviteCard, SidebarHeaderBanner } from './CommunityView'
 import { ColorPicker, CommunityIcon, ImagePickerRow } from './parts'
 import { EmojiTextarea } from '../EmojiButton'
-import { Hash } from 'lucide-react'
+import { Hash, UserPlus } from 'lucide-react'
 
 const DESCRIPTION_MAX = 300
 
@@ -22,18 +27,24 @@ type ImageKind = 'icon' | 'banner'
 
 export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
   const updateCommunity = useStore((s) => s.updateCommunity)
-  const memberCount = useStore((s) => s.members[detail.community.id]?.length)
+  const members = useStore((s) => s.members[detail.community.id])
+  const memberCount = members?.length
+  const me = useStore((s) => s.user)
   const { community } = detail
   const [description, setDescription] = useState(community.description ?? '')
   const [accent, setAccent] = useState<number | null>(community.accent_color ?? null)
   const [systemChannel, setSystemChannel] = useState(community.system_channel_id ?? '')
+  const [joinEnabled, setJoinEnabled] = useState(community.join_messages_enabled ?? true)
+  const [welcome, setWelcome] = useState(community.welcome_message ?? '')
   const [busy, setBusy] = useState<ImageKind | 'save' | null>(null)
   const [msg, setMsg] = useState<Feedback>(null)
 
   const dirty =
     description.trim() !== (community.description ?? '') ||
     accent !== (community.accent_color ?? null) ||
-    systemChannel !== (community.system_channel_id ?? '')
+    systemChannel !== (community.system_channel_id ?? '') ||
+    joinEnabled !== (community.join_messages_enabled ?? true) ||
+    welcome.trim() !== (community.welcome_message ?? '')
   useUnsavedChanges({
     dirty,
     busy: busy === 'save',
@@ -42,6 +53,8 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
       setDescription(community.description ?? '')
       setAccent(community.accent_color ?? null)
       setSystemChannel(community.system_channel_id ?? '')
+      setJoinEnabled(community.join_messages_enabled ?? true)
+      setWelcome(community.welcome_message ?? '')
       setMsg(null)
     },
   })
@@ -93,8 +106,11 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
         description: description.trim() || null,
         accent_color: accent,
         system_channel_id: systemChannel || null,
+        join_messages_enabled: joinEnabled,
+        welcome_message: welcome.trim() || null,
       })
       updateCommunity(updated)
+      setWelcome(updated.welcome_message ?? '')
       setMsg({ ok: true, text: 'Gespeichert.' })
     } catch (err) {
       setMsg({ ok: false, text: errorText(err) })
@@ -105,6 +121,7 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
 
   // Vorschau mit den noch nicht gespeicherten Angaben.
   const preview: Community = { ...community, description: description.trim() || null, accent_color: accent }
+  const joinActive = !!systemChannel && joinEnabled
 
   return (
     <div className="appearance-layout">
@@ -174,6 +191,42 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
           <span className="muted small">Hier erscheint „… ist beigetreten“, wenn jemand der Community beitritt.</span>
         </label>
 
+        <SwitchRow
+          title="Beitrittsmeldungen senden"
+          description="Meldet neue Mitglieder im Systemkanal."
+          checked={joinEnabled}
+          onChange={setJoinEnabled}
+          disabled={!systemChannel}
+          disabledReason="Zuerst einen Systemkanal wählen."
+        />
+
+        <label className="field">
+          <span>
+            Eigener Willkommenstext{' '}
+            <span className="muted small">
+              ({Array.from(welcome).length}/{WELCOME_MAX})
+            </span>
+          </span>
+          <EmojiTextarea
+            value={welcome}
+            onChange={(e) => setWelcome(e.target.value)}
+            maxLength={WELCOME_MAX}
+            rows={3}
+            disabled={!joinActive}
+            placeholder="z. B. Willkommen bei {community}, {user}! Schau zuerst in die Regeln."
+          />
+          <span className="muted small">
+            Leer lassen für die wechselnden Standardsätze. Markdown wie in Nachrichten; Platzhalter:{' '}
+            {WELCOME_PLACEHOLDERS.map((p, i) => (
+              <span key={p.token}>
+                {i > 0 && ', '}
+                <code>{p.token}</code> {p.label}
+              </span>
+            ))}
+            .
+          </span>
+        </label>
+
         {msg && <p className={msg.ok ? 'success' : 'error'}>{msg.text}</p>}
       </form>
 
@@ -205,6 +258,9 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
             </div>
           </div>
         </div>
+        {joinActive && (
+          <WelcomePreview template={welcome.trim()} communityName={community.name} members={members} me={me} />
+        )}
         <InviteCard
           preview={{
             community: {
@@ -219,6 +275,38 @@ export function CommunityAppearance({ detail }: { detail: CommunityDetail }) {
           }}
         />
       </aside>
+    </div>
+  )
+}
+
+/** Vorschau der Beitrittsmeldung, als wäre man selbst gerade beigetreten. */
+function WelcomePreview({
+  template,
+  communityName,
+  members,
+  me,
+}: {
+  template: string
+  communityName: string
+  members: Member[] | undefined
+  me: User | null
+}) {
+  const options = useMemo(() => ({ resolveMention: mentionResolver(members, undefined) }), [members])
+  return (
+    <div className="welcome-preview">
+      <h5>Beitrittsmeldung</h5>
+      <div className="message system-message">
+        <UserPlus size={16} className="system-message-icon" aria-hidden="true" />
+        {template ? (
+          <div className="system-message-text system-message-custom">
+            <Markdown content={renderWelcome(template, me?.username ?? 'neu', communityName)} options={options} />
+          </div>
+        ) : (
+          <span className="system-message-text">
+            <span className="message-author">{displayName(me)}</span> ist beigetreten.
+          </span>
+        )}
+      </div>
     </div>
   )
 }

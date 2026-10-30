@@ -243,7 +243,7 @@ pub async fn cleanup(db: &PgPool, storage: &dyn Storage, orphan_grace: Duration)
     delete_files(storage, &expired).await;
 
     // Abgleich: Dateien ohne Zeile in `attachments` und ohne Verweis als Avatar, Profilbanner,
-    // Community-Icon oder -Banner Feedback-Screenshot oder Custom-Emote.
+    // Community-Icon oder -Banner, Feedback-Screenshot, Custom-Emote oder Webhook-Avatar.
     let known: HashSet<Uuid> = sqlx::query_scalar(
         "SELECT id FROM attachments
          UNION ALL SELECT avatar_id FROM users WHERE avatar_id IS NOT NULL
@@ -251,7 +251,8 @@ pub async fn cleanup(db: &PgPool, storage: &dyn Storage, orphan_grace: Duration)
          UNION ALL SELECT icon_id FROM communities WHERE icon_id IS NOT NULL
          UNION ALL SELECT banner_id FROM communities WHERE banner_id IS NOT NULL
          UNION ALL SELECT screenshot_id FROM feedback WHERE screenshot_id IS NOT NULL
-         UNION ALL SELECT id FROM custom_emojis",
+         UNION ALL SELECT id FROM custom_emojis
+         UNION ALL SELECT avatar_id FROM webhooks WHERE avatar_id IS NOT NULL",
     )
     .fetch_all(db)
     .await?

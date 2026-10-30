@@ -9,8 +9,9 @@ import { roleColor } from '../lib/permissionLabels'
 import { statusOf } from '../lib/presence'
 import { displayName, useMember, useStore } from '../store'
 import { Avatar } from './Presence'
+import { BotTag } from './BotTag'
 import { EmojiInput } from './EmojiButton'
-import { Check, Crown, Maximize2, MessageCircle, Pencil, UserCheck, UserPlus, X } from 'lucide-react'
+import { Ban, Check, Crown, Maximize2, MessageCircle, Pencil, UserCheck, UserPlus, X } from 'lucide-react'
 import { addFriendWithFeedback, useFriends, useRelationshipType } from '../lib/friendsStore'
 import { friendActions } from '../lib/friends'
 import { runAction } from '../lib/toast'
@@ -18,6 +19,8 @@ import { accentStyle } from '../lib/customize'
 import { BannerFill } from './customize/parts'
 import { ProfileBio } from './customize/ProfileView'
 import { useProfileModal } from './customize/profileModal'
+import { openDialog } from '../lib/dialogs'
+import { memberRules } from '../lib/menuRules'
 
 const CARD_WIDTH = 300
 const MARGIN = 8
@@ -89,6 +92,22 @@ function ProfileCardInner() {
       ? has(perms, Permission.CHANGE_NICKNAME) || has(perms, Permission.MANAGE_NICKNAMES)
       : has(perms, Permission.MANAGE_NICKNAMES) && !isOwner)
 
+  const myRoleIds = useStore((s) =>
+    card.communityId ? s.members[card.communityId]?.find((m) => m.user.id === me?.id)?.role_ids : undefined,
+  )
+  const iAmOwner = !!detail && detail.community.owner_id === me?.id
+  const canBan =
+    !!detail &&
+    memberRules({
+      myPerms: perms,
+      iAmOwner,
+      myRoleIds: iAmOwner ? [] : myRoleIds,
+      isSelf,
+      targetIsOwner: isOwner,
+      targetRoleIds: member?.role_ids,
+      roles: detail.roles,
+    }).ban
+
   const roles: Role[] = member && detail
     ? sortRoles(detail.roles.filter((r) => !r.is_default && member.role_ids.includes(r.id)))
     : []
@@ -143,6 +162,7 @@ function ProfileCardInner() {
         <div className="profile-card-names">
           <strong className="profile-card-name">
             {name}
+            {(user?.bot || profile?.bot) && <BotTag />}
             {isOwner && (
               <span className="member-owner" title="Besitzer">
                 {' '}
@@ -230,7 +250,8 @@ function ProfileCardInner() {
               <Pencil size={13} aria-hidden="true" /> {isSelf ? 'Eigenen Nickname ändern' : 'Nickname ändern'}
             </button>
           ))}
-        {!isSelf && <FriendActions userId={card.userId} name={name} onDone={close} />}
+        {/* Bots haben keine Freundschaften. */}
+        {!isSelf && !(user?.bot || profile?.bot) && <FriendActions userId={card.userId} name={name} onDone={close} />}
         <button
           type="button"
           className="link-button profile-card-edit"
@@ -241,6 +262,18 @@ function ProfileCardInner() {
         >
           <Maximize2 size={13} aria-hidden="true" /> Vollständiges Profil
         </button>
+        {canBan && card.communityId && (
+          <button
+            type="button"
+            className="link-button danger profile-card-edit"
+            onClick={() => {
+              if (card.communityId) openDialog({ kind: 'ban', communityId: card.communityId, userId: card.userId, name })
+              close()
+            }}
+          >
+            <Ban size={13} aria-hidden="true" /> Bannen
+          </button>
+        )}
         {error && <p className="error small">{error}</p>}
       </div>
     </div>

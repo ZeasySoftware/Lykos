@@ -47,6 +47,11 @@ const CALL_RING_PER_USER: Limit = Limit { max: 8, window: Duration::from_secs(60
 /// Gesendete Nachrichten pro Nutzer über alle Kanäle – großzügig, kurze Schübe (Einfügen, schnelles
 /// Hin und Her) bleiben möglich, Dauerfeuer nicht.
 const MESSAGES_PER_USER: Limit = Limit { max: 120, window: Duration::from_secs(60) };
+/// Abrufe von Discord-Servervorlagen (Vorschau und Anlegen) pro Nutzer – jeder Abruf geht an Discord.
+const DISCORD_TEMPLATE_PER_USER: Limit = Limit { max: 20, window: Duration::from_secs(10 * 60) };
+/// Ausgeführte Webhook-Aufrufe (Senden, Bearbeiten, Löschen) pro Webhook.
+pub const WEBHOOK_PER_HOOK: u32 = 30;
+const WEBHOOK_EXECUTE: Limit = Limit { max: WEBHOOK_PER_HOOK, window: Duration::from_secs(60) };
 
 /// So oft werden abgelaufene Einträge mindestens entfernt.
 const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
@@ -69,6 +74,8 @@ enum Key {
     DmOpen(uuid::Uuid),
     CallRing(uuid::Uuid),
     Messages(uuid::Uuid),
+    DiscordTemplate(uuid::Uuid),
+    Webhook(uuid::Uuid),
 }
 
 impl Key {
@@ -84,6 +91,8 @@ impl Key {
             Key::DmOpen(_) => DM_OPEN_PER_USER,
             Key::CallRing(_) => CALL_RING_PER_USER,
             Key::Messages(_) => MESSAGES_PER_USER,
+            Key::DiscordTemplate(_) => DISCORD_TEMPLATE_PER_USER,
+            Key::Webhook(_) => WEBHOOK_EXECUTE,
         }
     }
 }
@@ -171,6 +180,16 @@ impl RateLimiter {
     /// Zählt eine gesendete Nachricht des Nutzers.
     pub fn message_send(&self, user_id: uuid::Uuid) -> ApiResult<()> {
         self.attempt(&[Key::Messages(user_id)])
+    }
+
+    /// Zählt einen Abruf einer Discord-Servervorlage des Nutzers.
+    pub fn discord_template(&self, user_id: uuid::Uuid) -> ApiResult<()> {
+        self.attempt(&[Key::DiscordTemplate(user_id)])
+    }
+
+    /// Zählt einen Aufruf des Webhooks (`POST/PATCH/DELETE /webhooks/{id}/{token}…`).
+    pub fn webhook_execute(&self, webhook_id: uuid::Uuid) -> ApiResult<()> {
+        self.attempt(&[Key::Webhook(webhook_id)])
     }
 
     fn attempt(&self, keys: &[Key]) -> ApiResult<()> {

@@ -23,6 +23,9 @@ pub enum ApiError {
     RateLimited { retry_after: u64 },
     #[error("zu groß: {0}")]
     PayloadTooLarge(&'static str),
+    /// Vom AutoMod der Community blockiert: `403 { error: "automod_blocked", rule, rule_name, message }`.
+    #[error("vom AutoMod blockiert: {rule}")]
+    AutomodBlocked { rule: &'static str, rule_name: &'static str, message: String },
     #[error("nicht verfügbar: {0}")]
     ServiceUnavailable(&'static str),
     #[error(transparent)]
@@ -49,6 +52,10 @@ impl IntoResponse for ApiError {
             res.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(retry_after));
             return res;
         }
+        if let ApiError::AutomodBlocked { rule, rule_name, message } = self {
+            let body = json!({ "error": "automod_blocked", "rule": rule, "rule_name": rule_name, "message": message });
+            return (StatusCode::FORBIDDEN, Json(body)).into_response();
+        }
         let (status, code) = match &self {
             ApiError::BadRequest(c) => (StatusCode::BAD_REQUEST, *c),
             ApiError::Unauthorized(c) => (StatusCode::UNAUTHORIZED, *c),
@@ -58,6 +65,7 @@ impl IntoResponse for ApiError {
             ApiError::RateLimited { .. } => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
             ApiError::PayloadTooLarge(c) => (StatusCode::PAYLOAD_TOO_LARGE, *c),
             ApiError::ServiceUnavailable(c) => (StatusCode::SERVICE_UNAVAILABLE, *c),
+            ApiError::AutomodBlocked { .. } => (StatusCode::FORBIDDEN, "automod_blocked"),
             ApiError::Database(_) | ApiError::Internal(_) => {
                 tracing::error!(error = %self, "interner Fehler");
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal")

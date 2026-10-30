@@ -134,11 +134,14 @@ export function setToken(value: string | null) {
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
+  /** Vollständige Fehlerantwort (z. B. `message` bei `automod_blocked`). */
+  readonly data: Record<string, unknown>
 
-  constructor(status: number, code: string) {
+  constructor(status: number, code: string, data: Record<string, unknown> = {}) {
     super(`API-Fehler ${status}: ${code}`)
     this.status = status
     this.code = code
+    this.data = data
   }
 }
 
@@ -163,7 +166,7 @@ export async function api<T>(path: string, method: Method = 'GET', body?: unknow
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new ApiError(res.status, data.error ?? 'unknown')
+    throw new ApiError(res.status, data.error ?? 'unknown', data && typeof data === 'object' ? data : {})
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -215,6 +218,8 @@ export interface InstanceInfo {
   source_url?: string
   /** Hinterlegte Rechtstexte (`/legal/imprint`, `/legal/privacy`); ältere Server liefern das Feld nicht. */
   legal?: LegalAvailability
+  /** Bot-Konten erlaubt (Tab „Entwickler“, Bots hinzufügen). Ältere Server: fehlt = nein. */
+  allow_bots?: boolean
 }
 
 export interface LegalAvailability {
@@ -249,6 +254,8 @@ export interface User {
   banner_color?: number | null
   /** Akzentfarbe der Profilkarte 0xRRGGBB. */
   accent_color?: number | null
+  /** Bot-Konto. */
+  bot?: boolean
 }
 
 export interface UserPublic {
@@ -256,6 +263,8 @@ export interface UserPublic {
   username: string
   display_name: string | null
   avatar_url?: string | null
+  /** Bot-Konto (fehlt bei Menschen). */
+  bot?: boolean
 }
 
 /** Profil eines Nutzers (`GET /users/{id}`, Gateway `USER_UPDATE`). */
@@ -304,6 +313,23 @@ export interface Community {
   accent_color?: number | null
   /** Textkanal für Beitritts-Meldungen. */
   system_channel_id?: string | null
+  /** Beitrittsmeldungen im Systemkanal senden (ältere Server: fehlt = an). */
+  join_messages_enabled?: boolean
+  /** Eigener Willkommenstext mit `{user}`/`{community}`; `null` = zufällige Standardsätze. */
+  welcome_message?: string | null
+  /** Sprachkanal für Inaktive (dort nur zuhören). */
+  afk_channel_id?: string | null
+  /** Sekunden ohne Aktivität bis zum Wechsel in den AFK-Kanal. */
+  afk_timeout_seconds?: number
+}
+
+/** Eintrag der Bannliste einer Community. */
+export interface Ban {
+  user: UserPublic
+  reason: string | null
+  /** `null`, wenn das Konto des Moderators gelöscht ist. */
+  banned_by: UserPublic | null
+  created_at: string
 }
 
 export type ChannelKind = 'text' | 'voice'
@@ -322,6 +348,39 @@ export interface Channel {
   audio_red: boolean
   /** Höchstzahl gleichzeitiger Teilnehmer (1–99), `null` = unbegrenzt. */
   user_limit: number | null
+  /** Kategorie in der Seitenleiste; `null` = ohne Kategorie (oben). */
+  category_id: string | null
+}
+
+/** Kanal-Kategorie (nur Gruppierung, ohne eigene Rechte). */
+export interface Category {
+  id: string
+  community_id: string
+  name: string
+  position: number
+}
+
+/** Kanal in der Vorschau einer Discord-Servervorlage. */
+export interface TemplateChannel {
+  name: string
+  kind: ChannelKind
+  /** War bei Discord ein Forum-/Medienkanal (wird Textkanal). */
+  from_forum: boolean
+}
+
+/** Vorschau einer Discord-Servervorlage (`GET /communities/templates/discord/{code}`). */
+export interface DiscordTemplatePreview {
+  code: string
+  name: string
+  description: string | null
+  counts: { roles: number; categories: number; text_channels: number; voice_channels: number }
+  /** Höchste zuerst. */
+  roles: { name: string; color: number | null }[]
+  /** Kanäle ohne Kategorie. */
+  channels: TemplateChannel[]
+  categories: { name: string; channels: TemplateChannel[] }[]
+  /** Hinweise, was nicht übernommen wird. */
+  notes: string[]
 }
 
 export type DmKind = 'dm' | 'group_dm'
@@ -348,6 +407,11 @@ export interface DmChannel {
   last_read_message_id: string | null
   /** Ungelesene Erwähnungen (in Gateway-Events immer 0). */
   mention_count: number
+  /**
+   * Seit wann man die Unterhaltung selbst angepinnt hat; `null` = nicht angepinnt. In Gateway-Events immer `null`
+   * (Änderungen kommen als `DM_PIN_UPDATE`). Fehlt bei älteren Servern.
+   */
+  pinned_at?: string | null
 }
 
 /** Beziehung aus eigener Sicht (Freundesystem). */
@@ -403,14 +467,132 @@ export interface Message {
   pinned_at?: string | null
   /**
    * Systemnachrichten (Inhalt leer): `member_join` = „… ist beigetreten“, `call_missed` = nicht angenommener
-   * Anruf in einer 1:1-DM (Autor = Anrufer). Fehlt bei älteren Servern.
+   * Anruf in einer 1:1-DM (Autor = Anrufer), `recipient_add` = Autor hat `mentions` zur Gruppe hinzugefügt.
+   * `automod_alert` = AutoMod-Alarm im Protokollkanal (Autor = betroffenes
+   * Mitglied, `content` = JSON, siehe `AutoModAlertData`). Fehlt bei älteren Servern.
    */
-  kind?: 'default' | 'member_join' | 'call_missed'
+  kind?: 'default' | 'member_join' | 'call_missed' | 'recipient_add' | 'automod_alert'
+  /** Webhook, der die Nachricht gesendet hat (`author` ist dann `null`); `null`, wenn er gelöscht ist. */
+  webhook_id?: string | null
+  /** Absender-Anzeige einer Webhook-Nachricht. */
+  webhook?: WebhookAuthor | null
+  /** Karten (Discord-Embeds, ohne Bilder). */
+  embeds?: Embed[]
+}
+
+export type AutoModRuleKind = 'keyword' | 'links' | 'mentions' | 'spam'
+
+export interface AutoModActions {
+  block: boolean
+  alert: boolean
+  audit: boolean
+}
+
+export interface AutoModKeywordConfig {
+  terms: string[]
+  allow: string[]
+}
+
+export interface AutoModLinksConfig {
+  allowed_domains: string[]
+  block_foreign_invites: boolean
+}
+
+export interface AutoModMentionsConfig {
+  max_mentions: number
+}
+
+export interface AutoModSpamConfig {
+  max_messages: number
+  per_seconds: number
+  max_duplicates: number
+}
+
+interface AutoModRuleBase {
+  enabled: boolean
+  actions: AutoModActions
+  alert_channel_id: string | null
+  custom_message: string | null
+  exempt_role_ids: string[]
+  exempt_channel_ids: string[]
+}
+
+/** AutoMod-Regel einer Community (`GET/PUT /communities/{id}/automod`). */
+export type AutoModRule =
+  | (AutoModRuleBase & { kind: 'keyword'; config: AutoModKeywordConfig })
+  | (AutoModRuleBase & { kind: 'links'; config: AutoModLinksConfig })
+  | (AutoModRuleBase & { kind: 'mentions'; config: AutoModMentionsConfig })
+  | (AutoModRuleBase & { kind: 'spam'; config: AutoModSpamConfig })
+
+/** Inhalt einer `automod_alert`-Systemnachricht. */
+export interface AutoModAlertData {
+  rule: AutoModRuleKind
+  rule_name: string
+  channel_id: string
+  blocked: boolean
+  edit: boolean
+  detail: string
+  excerpt: string
+}
+
+export interface WebhookAuthor {
+  name: string
+  avatar_url: string | null
+}
+
+/** Bereinigtes Embed – Bilder speichert der Server bewusst nicht. */
+export interface Embed {
+  title?: string
+  description?: string
+  /** Link des Titels (nur http/https). */
+  url?: string
+  /** Farbe des Randstreifens 0xRRGGBB. */
+  color?: number
+  /** RFC 3339. */
+  timestamp?: string
+  fields?: { name: string; value: string; inline: boolean }[]
+  author?: { name: string; url?: string }
+  footer?: { text: string }
+}
+
+/** Eingehender Webhook eines Textkanals. */
+export interface Webhook {
+  id: string
+  community_id: string
+  channel_id: string
+  name: string
+  avatar_url: string | null
+  created_by: UserPublic | null
+  created_at: string
+}
+
+/** Antwort beim Anlegen/Neu-Erzeugen: Token und URL gibt es nur hier im Klartext. */
+export interface WebhookWithToken extends Webhook {
+  token: string
+  url: string
+}
+
+/** Eigener (oder öffentlicher) Bot. */
+export interface Bot {
+  id: string
+  username: string
+  display_name: string | null
+  avatar_url: string | null
+  description: string | null
+  is_public: boolean
+  owner_id: string
+  created_at: string
+}
+
+export interface BotWithToken extends Bot {
+  token: string
 }
 
 export interface MessageReference {
   id: string
   author: UserPublic | null
+  /** Name des Webhooks, wenn das Original von einem Webhook stammt. */
+  webhook_name?: string
   /** Auf 200 Zeichen gekürzt. */
   content: string
   has_attachments: boolean
@@ -469,6 +651,8 @@ export interface InvitePreview {
 export interface CommunityDetail {
   community: Community
   channels: Channel[]
+  /** Kategorien mit sichtbaren Kanälen (mit `MANAGE_CHANNELS` alle). Fehlt bei älteren Servern. */
+  categories?: Category[]
   roles: Role[]
   permissions: number
   channel_permissions: Record<string, number>
@@ -685,6 +869,11 @@ export const endpoints = {
 
   communities: () => api<Community[]>('/communities'),
   createCommunity: (name: string) => api<CommunityDetail>('/communities', 'POST', { name }),
+  /** Community mit der Struktur einer Discord-Servervorlage anlegen (`code` = Code oder Link). */
+  createCommunityFromTemplate: (code: string, name?: string) =>
+    api<CommunityDetail>('/communities', 'POST', { name, discord_template: code }),
+  discordTemplate: (code: string) =>
+    api<DiscordTemplatePreview>(`/communities/templates/discord/${enc(code)}`),
   community: (id: string) => api<CommunityDetail>(`/communities/${enc(id)}`),
   updateCommunity: (
     id: string,
@@ -695,6 +884,10 @@ export const endpoints = {
       description?: string | null
       accent_color?: number | null
       system_channel_id?: string | null
+      join_messages_enabled?: boolean
+      welcome_message?: string | null
+      afk_channel_id?: string | null
+      afk_timeout_seconds?: number
     },
   ) =>
     api<Community>(`/communities/${enc(id)}`, 'PATCH', body),
@@ -703,14 +896,30 @@ export const endpoints = {
   members: (id: string) => api<Member[]>(`/communities/${enc(id)}/members`),
   removeMember: (communityId: string, userId: string) =>
     api<void>(`/communities/${enc(communityId)}/members/${enc(userId)}`, 'DELETE'),
+  /** Bannen; `deleteMessageSeconds` löscht dessen Nachrichten aus diesem Zeitraum (max. 7 Tage). */
+  banMember: (communityId: string, userId: string, body: { reason?: string; delete_message_seconds?: number }) =>
+    api<void>(`/communities/${enc(communityId)}/bans/${enc(userId)}`, 'PUT', body),
+  unbanMember: (communityId: string, userId: string) =>
+    api<void>(`/communities/${enc(communityId)}/bans/${enc(userId)}`, 'DELETE'),
+  bans: (communityId: string) => api<Ban[]>(`/communities/${enc(communityId)}/bans`),
   /** Nickname setzen; `userId` = `@me` für den eigenen. `null` entfernt ihn. */
   setNickname: (communityId: string, userId: string, nickname: string | null) =>
     api<Member>(`/communities/${enc(communityId)}/members/${enc(userId)}`, 'PATCH', { nickname }),
   transferCommunity: (communityId: string, userId: string) =>
     api<Community>(`/communities/${enc(communityId)}/transfer`, 'POST', { user_id: userId }),
 
-  createChannel: (communityId: string, body: { name: string; kind: ChannelKind; topic?: string }) =>
-    api<Channel>(`/communities/${enc(communityId)}/channels`, 'POST', body),
+  createChannel: (
+    communityId: string,
+    body: { name: string; kind: ChannelKind; topic?: string; category_id?: string | null },
+  ) => api<Channel>(`/communities/${enc(communityId)}/channels`, 'POST', body),
+  createCategory: (communityId: string, name: string) =>
+    api<Category>(`/communities/${enc(communityId)}/categories`, 'POST', { name }),
+  updateCategory: (id: string, body: { name?: string; position?: number }) =>
+    api<Category>(`/categories/${enc(id)}`, 'PATCH', body),
+  deleteCategory: (id: string) => api<void>(`/categories/${enc(id)}`, 'DELETE'),
+  /** Reihenfolge aller Kategorien setzen (oben zuerst). */
+  reorderCategories: (communityId: string, categoryIds: string[]) =>
+    api<Category[]>(`/communities/${enc(communityId)}/categories/order`, 'PATCH', { category_ids: categoryIds }),
 
   messages: (channelId: string, before?: string, limit = 50) => {
     const q = new URLSearchParams({ limit: String(limit) })
@@ -753,6 +962,9 @@ export const endpoints = {
     api<void>(`/communities/${enc(communityId)}/members/${enc(userId)}/roles/${enc(roleId)}`, 'PUT'),
   removeMemberRole: (communityId: string, userId: string, roleId: string) =>
     api<void>(`/communities/${enc(communityId)}/members/${enc(userId)}/roles/${enc(roleId)}`, 'DELETE'),
+  automod: (communityId: string) => api<AutoModRule[]>(`/communities/${enc(communityId)}/automod`),
+  updateAutomod: (communityId: string, rules: AutoModRule[]) =>
+    api<AutoModRule[]>(`/communities/${enc(communityId)}/automod`, 'PUT', { rules }),
   auditLog: (communityId: string, before?: string, limit = 50) => {
     const q = new URLSearchParams({ limit: String(limit) })
     if (before) q.set('before', before)
@@ -777,6 +989,7 @@ export const endpoints = {
       audio_dtx?: boolean
       audio_red?: boolean
       user_limit?: number | null
+      category_id?: string | null
     },
   ) =>
     api<Channel>(`/channels/${enc(id)}`, 'PATCH', body),
@@ -789,10 +1002,41 @@ export const endpoints = {
   invites: (communityId: string) => api<Invite[]>(`/communities/${enc(communityId)}/invites`),
   deleteInvite: (code: string) => api<void>(`/invites/${enc(code)}`, 'DELETE'),
 
+  // --- Eingehende Webhooks ---
+  channelWebhooks: (channelId: string) => api<Webhook[]>(`/channels/${enc(channelId)}/webhooks`),
+  createWebhook: (channelId: string, name: string) =>
+    api<WebhookWithToken>(`/channels/${enc(channelId)}/webhooks`, 'POST', { name }),
+  updateWebhook: (id: string, body: { name?: string; channel_id?: string }) =>
+    api<Webhook>(`/webhooks/${enc(id)}`, 'PATCH', body),
+  regenerateWebhookToken: (id: string) => api<WebhookWithToken>(`/webhooks/${enc(id)}/token`, 'POST'),
+  deleteWebhook: (id: string) => api<void>(`/webhooks/${enc(id)}`, 'DELETE'),
+  deleteWebhookAvatar: (id: string) => api<Webhook>(`/webhooks/${enc(id)}/avatar`, 'DELETE'),
+
+  // --- Bot-Konten ---
+  bots: () => api<Bot[]>('/bots'),
+  bot: (id: string) => api<Bot>(`/bots/${enc(id)}`),
+  createBot: (body: { username: string; display_name?: string | null; description?: string | null; is_public?: boolean }) =>
+    api<BotWithToken>('/bots', 'POST', body),
+  updateBot: (id: string, body: { display_name?: string | null; description?: string | null; is_public?: boolean }) =>
+    api<Bot>(`/bots/${enc(id)}`, 'PATCH', body),
+  regenerateBotToken: (id: string) => api<BotWithToken>(`/bots/${enc(id)}/token`, 'POST'),
+  deleteBot: (id: string) => api<void>(`/bots/${enc(id)}`, 'DELETE'),
+  deleteBotAvatar: (id: string) => api<Bot>(`/bots/${enc(id)}/avatar`, 'DELETE'),
+  addBotToCommunity: (communityId: string, botId: string) =>
+    api<Member>(`/communities/${enc(communityId)}/bots`, 'POST', { bot_id: botId }),
+
   // --- Direktnachrichten & Suche ---
   dms: () => api<DmChannel[]>('/dms'),
   createDm: (recipientIds: string[], name?: string) =>
     api<DmChannel>('/dms', 'POST', { recipient_ids: recipientIds, name: name || undefined }),
+  /** Immer eine neue Gruppe – auch mit einer oder keiner weiteren Person. */
+  createGroupDm: (recipientIds: string[], name?: string) =>
+    api<DmChannel>('/dms', 'POST', { recipient_ids: recipientIds, name: name || undefined, group: true }),
+  /** Leute hinzufügen: Gruppe → erweiterte Gruppe, 1:1-DM → neue Gruppe. */
+  addDmRecipients: (id: string, recipientIds: string[]) =>
+    api<DmChannel>(`/dms/${enc(id)}/recipients`, 'POST', { recipient_ids: recipientIds }),
+  pinDm: (id: string) => api<DmChannel>(`/dms/${enc(id)}/pin`, 'PUT'),
+  unpinDm: (id: string) => api<void>(`/dms/${enc(id)}/pin`, 'DELETE'),
   renameDm: (id: string, name: string | null) => api<DmChannel>(`/dms/${enc(id)}`, 'PATCH', { name }),
   leaveDm: (id: string) => api<void>(`/dms/${enc(id)}`, 'DELETE'),
   dmContacts: () => api<UserPublic[]>('/dms/contacts'),
@@ -926,6 +1170,16 @@ export function uploadAttachment(channelId: string, file: File, onProgress: (fra
 /** Profilbild hochladen (bereits zugeschnitten, siehe `lib/avatar.ts`). */
 export function uploadAvatar(file: Blob, filename: string): Promise<User> {
   return uploadImage<User>('/auth/me/avatar', file, filename)
+}
+
+/** Avatar eines Webhooks hochladen (bereits zugeschnitten wie Profilbilder). */
+export function uploadWebhookAvatar(webhookId: string, file: Blob, filename: string): Promise<Webhook> {
+  return uploadImage<Webhook>(`/webhooks/${encodeURIComponent(webhookId)}/avatar`, file, filename)
+}
+
+/** Avatar eines eigenen Bots hochladen (bereits zugeschnitten wie Profilbilder). */
+export function uploadBotAvatar(botId: string, file: Blob, filename: string): Promise<Bot> {
+  return uploadImage<Bot>(`/bots/${encodeURIComponent(botId)}/avatar`, file, filename)
 }
 
 /** Profilbanner hochladen (bereits zugeschnitten, siehe `lib/image.ts`). */

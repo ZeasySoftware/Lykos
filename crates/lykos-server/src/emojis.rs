@@ -277,6 +277,32 @@ pub async fn sanitize(db: impl PgExecutor<'_>, user_id: Uuid, content: &str) -> 
     }))
 }
 
+/// Wie `sanitize`, aber für Absender ohne Konto (Webhooks): nur Emotes der eigenen Community bleiben.
+pub async fn sanitize_in_community(
+    db: impl PgExecutor<'_>,
+    community_id: Uuid,
+    content: &str,
+) -> ApiResult<String> {
+    let found = tokens(content);
+    if found.is_empty() {
+        return Ok(content.to_owned());
+    }
+    let ids: Vec<Uuid> = found.iter().map(|t| t.id).collect();
+    let usable: Vec<(Uuid, String, bool)> = sqlx::query_as(
+        "SELECT id, name, animated FROM custom_emojis WHERE community_id = $1 AND id = ANY($2)",
+    )
+    .bind(community_id)
+    .bind(&ids)
+    .fetch_all(db)
+    .await?;
+    let usable: HashMap<Uuid, (String, bool)> =
+        usable.into_iter().map(|(id, name, animated)| (id, (name, animated))).collect();
+    Ok(rewrite(content, |t| match usable.get(&t.id) {
+        Some((name, animated)) => format_token(name, t.id, *animated),
+        None => format!(":{}:", t.name),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

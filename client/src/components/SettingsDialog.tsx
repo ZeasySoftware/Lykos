@@ -21,6 +21,7 @@ import { useAdminPanel } from './admin/adminPanel'
 import { SoundSettings } from './settings/SoundSettings'
 import { UpdateSettings } from './settings/UpdateSettings'
 import { SecuritySettings } from './settings/SecuritySettings'
+import { DeveloperSettings } from './settings/DeveloperSettings'
 import { ReauthFields } from './settings/ReauthFields'
 import { emptyReauth, reauthBody, useSecurityOverview } from '../lib/reauth'
 import { StorageTab } from './StorageUsage'
@@ -54,6 +55,7 @@ const GROUPS: SettingsGroup<Section>[] = [
       { id: 'notifications', label: 'Benachrichtigungen' },
       { id: 'desktop', label: 'Desktop-App', hidden: !hasDesktopShell },
       { id: 'advanced', label: 'Erweitert' },
+      { id: 'developer', label: 'Entwickler' },
     ],
   },
   // Vorläufig: Instanz-Verwaltung nur für Instanz-Admins (später eigener Admin-Bereich).
@@ -68,7 +70,12 @@ const GROUPS: SettingsGroup<Section>[] = [
 export function SettingsDialog({ onClose, initialTab = 'account' }: { onClose: () => void; initialTab?: SettingsTab }) {
   const logout = useStore((s) => s.logout)
   const isAdmin = useStore((s) => s.user?.is_instance_admin ?? false)
-  const groups = isAdmin ? GROUPS : GROUPS.filter((g) => g.title !== 'Instanz')
+  // „Entwickler“ (Bot-Konten) nur, wenn die Instanz Bots erlaubt.
+  const allowBots = useStore((s) => s.instance?.allow_bots ?? false)
+  const groups = (isAdmin ? GROUPS : GROUPS.filter((g) => g.title !== 'Instanz')).map((g) => ({
+    ...g,
+    items: g.items.map((i) => (i.id === 'developer' ? { ...i, hidden: !allowBots } : i)),
+  }))
   // „Darstellung“ gibt es nicht als eigenen Bereich – ältere Verweise landen bei „Erweitert“.
   const [tab, setTab] = useState<SettingsTab>(initialTab === 'appearance' ? 'advanced' : initialTab)
 
@@ -141,6 +148,7 @@ export function SettingsDialog({ onClose, initialTab = 'account' }: { onClose: (
       {tab === 'notifications' && <NotificationsPage />}
       {tab === 'desktop' && hasDesktopShell && <DesktopPage />}
       {tab === 'advanced' && <AdvancedPage />}
+      {tab === 'developer' && allowBots && <DeveloperSettings />}
     </SettingsLayer>
   )
 }

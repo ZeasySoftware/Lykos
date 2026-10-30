@@ -1,6 +1,7 @@
 import { getServerUrl, getToken } from './api'
 import type {
   CallUpdate,
+  Category,
   Channel,
   ChosenStatus,
   Community,
@@ -50,8 +51,12 @@ export type GatewayEvent =
   | { t: 'EMOJIS_UPDATE'; d: { community_id: string; emojis: CustomEmoji[] } }
   | { t: 'DM_CREATE' | 'DM_UPDATE'; d: DmChannel }
   | { t: 'DM_DELETE'; d: { id: string } }
+  /** Eigene Unterhaltung angepinnt bzw. gelöst (nur an die eigenen Verbindungen). */
+  | { t: 'DM_PIN_UPDATE'; d: { channel_id: string; pinned_at: string | null } }
   | { t: 'CHANNEL_CREATE' | 'CHANNEL_UPDATE'; d: Channel }
   | { t: 'CHANNEL_DELETE'; d: { id: string; community_id: string } }
+  | { t: 'CATEGORY_CREATE' | 'CATEGORY_UPDATE'; d: Category }
+  | { t: 'CATEGORY_DELETE'; d: { id: string; community_id: string } }
   | { t: 'COMMUNITY_UPDATE'; d: Community }
   | { t: 'COMMUNITY_DELETE'; d: { id: string } }
   | { t: 'MEMBER_ADD' | 'MEMBER_UPDATE'; d: { community_id: string; member: Member } }

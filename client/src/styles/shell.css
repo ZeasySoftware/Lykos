@@ -333,6 +333,12 @@
 .channel-row .channel {
   padding-right: 32px;
 }
+/* AFK-Kanal: dezentes Mond-Symbol hinter dem Namen. */
+.channel-afk {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
 .channel-settings {
   position: absolute;
   right: 4px;
@@ -341,6 +347,41 @@
 }
 .channel-row:hover .channel-settings,
 .channel-settings:focus-visible {
+  opacity: 1;
+}
+
+/* Kanal-Kategorien: Kopf als Klappschalter, Aktionen (Zahnrad, Plus) beim Überfahren. */
+.category-group > header {
+  padding-left: 0;
+}
+.category-toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.category-toggle:hover {
+  color: var(--text);
+}
+.category-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.category-group > header:hover .category-actions,
+.category-actions:focus-within {
   opacity: 1;
 }
 
@@ -363,6 +404,53 @@
   border-radius: 50%;
   background: var(--bg-elevated-2);
   color: var(--text);
+}
+.dm-entry-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.dm-pin-mark {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+/* Abschnitte „Angepinnt“ / „Direktnachrichten“ (nur wenn etwas angepinnt ist). */
+.channel-list > .dm-friends-entry + .dm-group,
+.channel-list > .sidebar-empty + .dm-group {
+  margin-top: var(--sp-3);
+}
+/* Schnellaktionen am Eintrag (Anpinnen, Gruppe bearbeiten): erscheinen beim Überfahren. */
+.dm-row .channel {
+  padding-right: 8px;
+}
+.dm-row:hover .channel,
+.dm-row:focus-within .channel {
+  padding-right: 36px;
+}
+.dm-row.has-settings:hover .channel,
+.dm-row.has-settings:focus-within .channel {
+  padding-right: 64px;
+}
+.dm-row:hover .channel .mention-badge,
+.dm-row:focus-within .channel .mention-badge,
+.dm-row:hover .channel .dm-call-icon,
+.dm-row:focus-within .channel .dm-call-icon {
+  display: none;
+}
+.dm-entry-actions {
+  position: absolute;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.dm-row:hover .dm-entry-actions,
+.dm-row:focus-within .dm-entry-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* ---------- Nutzerbereich unten links ---------- */

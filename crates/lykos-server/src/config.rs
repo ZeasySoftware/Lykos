@@ -67,6 +67,9 @@ pub struct Config {
     /// Rechtstexte der Instanz (Impressum, Datenschutzerklärung) als Markdown, beim Start eingelesen.
     /// `LYKOS_IMPRINT_FILE`, `LYKOS_PRIVACY_FILE`.
     pub legal: LegalTexts,
+    /// Basis der Discord-API für den Import von Servervorlagen (fest `discord_template::DEFAULT_API_URL`;
+    /// nur Tests setzen einen lokalen Server ein). Nutzer bestimmen nie die abgerufene URL, nur den Code.
+    pub discord_api_url: String,
 }
 
 /// Klingeldauer eines DM-Anrufs, wenn niemand annimmt oder ablehnt.
@@ -682,6 +685,7 @@ impl Config {
             call_ring_secs: DEFAULT_CALL_RING_SECS,
             feedback_gitea,
             legal,
+            discord_api_url: crate::discord_template::DEFAULT_API_URL.into(),
         })
     }
 }
@@ -738,6 +742,8 @@ impl Config {
             feedback_gitea: None,
             call_ring_secs: DEFAULT_CALL_RING_SECS,
             legal: LegalTexts::default(),
+            // Zeigt ins Leere: Tests, die Vorlagen abrufen, setzen einen eigenen Server ein.
+            discord_api_url: "http://127.0.0.1:9".into(),
         }
     }
 

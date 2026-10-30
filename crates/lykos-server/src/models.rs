@@ -5,7 +5,7 @@ use sqlx::{FromRow, PgExecutor};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::{attachments::Attachment, error::ApiResult, permissions::Permissions};
+use crate::{attachments::Attachment, embeds::Embed, error::ApiResult, permissions::Permissions};
 
 /// Eigenes Konto (`/auth/me`, `READY`).
 #[derive(Debug, Clone, Serialize)]
@@ -30,6 +30,9 @@ pub struct User {
     pub banner_color: Option<i32>,
     /// Akzentfarbe der Profilkarte (0xRRGGBB).
     pub accent_color: Option<i32>,
+    /// Bot-Konto (siehe `routes::bots`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bot: bool,
 }
 
 /// Öffentliche Kurzform eines Nutzers (Autor, Mitglied, Audit-Akteur).
@@ -39,11 +42,20 @@ pub struct UserPublic {
     pub username: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    /// Bot-Konto; fehlt bei Menschen. Gesetzt bei Mitgliedern und Nachrichten-Autoren.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bot: bool,
 }
 
 impl UserPublic {
     pub fn new(id: Uuid, username: String, display_name: Option<String>, avatar_id: Option<Uuid>) -> Self {
-        Self { id, username, display_name, avatar_url: avatar_url(id, avatar_id) }
+        Self { id, username, display_name, avatar_url: avatar_url(id, avatar_id), bot: false }
+    }
+
+    /// Markiert den Nutzer als Bot.
+    pub fn with_bot(mut self, bot: bool) -> Self {
+        self.bot = bot;
+        self
     }
 }
 
@@ -62,6 +74,8 @@ pub struct UserProfile {
     pub accent_color: Option<i32>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bot: bool,
 }
 
 impl From<User> for UserProfile {
@@ -78,6 +92,7 @@ impl From<User> for UserProfile {
             banner_color: u.banner_color,
             accent_color: u.accent_color,
             created_at: u.created_at,
+            bot: u.bot,
         }
     }
 }
@@ -112,6 +127,14 @@ pub struct Community {
     pub accent_color: Option<i32>,
     /// Textkanal für Beitritts-Meldungen; `null` = keine.
     pub system_channel_id: Option<Uuid>,
+    /// Beitrittsmeldungen im Systemkanal senden.
+    pub join_messages_enabled: bool,
+    /// Eigener Willkommenstext (Platzhalter `{user}`, `{community}`); `null` = zufällige Standardsätze.
+    pub welcome_message: Option<String>,
+    /// Sprachkanal für Inaktive (dort weder Sprechen noch Stream/Kamera); `null` = keiner.
+    pub afk_channel_id: Option<Uuid>,
+    /// Sekunden ohne Aktivität, nach denen der Client in den AFK-Kanal wechselt.
+    pub afk_timeout_seconds: i32,
 }
 
 /// Spalten für `CommunityRow` (Tabellen-Alias `c`).
@@ -119,7 +142,8 @@ pub struct Community {
 macro_rules! community_columns {
     () => {
         "c.id, c.name, c.owner_id, c.message_retention_days, c.upload_quota_mb, c.created_at,
-         c.icon_id, c.banner_id, c.description, c.accent_color, c.system_channel_id"
+         c.icon_id, c.banner_id, c.description, c.accent_color, c.system_channel_id,
+         c.join_messages_enabled, c.welcome_message, c.afk_channel_id, c.afk_timeout_seconds"
     };
 }
 
@@ -136,6 +160,10 @@ pub struct CommunityRow {
     description: Option<String>,
     accent_color: Option<i32>,
     system_channel_id: Option<Uuid>,
+    join_messages_enabled: bool,
+    welcome_message: Option<String>,
+    afk_channel_id: Option<Uuid>,
+    afk_timeout_seconds: i32,
 }
 
 impl From<CommunityRow> for Community {
@@ -152,6 +180,10 @@ impl From<CommunityRow> for Community {
             description: r.description,
             accent_color: r.accent_color,
             system_channel_id: r.system_channel_id,
+            join_messages_enabled: r.join_messages_enabled,
+            welcome_message: r.welcome_message,
+            afk_channel_id: r.afk_channel_id,
+            afk_timeout_seconds: r.afk_timeout_seconds,
         }
     }
 }
@@ -175,13 +207,33 @@ pub struct Channel {
     pub audio_red: bool,
     /// Höchstzahl gleichzeitiger Teilnehmer (1–99), `None` = unbegrenzt.
     pub user_limit: Option<i32>,
+    /// Kategorie in der Seitenleiste; `None` = ohne Kategorie (oben) bzw. bei DM-Kanälen.
+    pub category_id: Option<Uuid>,
 }
 
 /// Spalten für `Channel` (ohne Tabellen-Alias).
 #[macro_export]
 macro_rules! channel_columns {
     () => {
-        "id, community_id, name, kind, topic, position, audio_bitrate, audio_stereo, audio_dtx, audio_red, user_limit"
+        "id, community_id, name, kind, topic, position, audio_bitrate, audio_stereo, audio_dtx, audio_red, user_limit,
+         category_id"
+    };
+}
+
+/// Kanal-Kategorie einer Community (nur Gruppierung, ohne eigene Rechte).
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct Category {
+    pub id: Uuid,
+    pub community_id: Uuid,
+    pub name: String,
+    pub position: i32,
+}
+
+/// Spalten für `Category` (ohne Tabellen-Alias).
+#[macro_export]
+macro_rules! category_columns {
+    () => {
+        "id, community_id, name, position"
     };
 }
 
@@ -229,8 +281,30 @@ pub struct Message {
     pub mention_everyone: bool,
     #[serde(with = "time::serde::rfc3339::option")]
     pub pinned_at: Option<OffsetDateTime>,
-    /// `default` oder Systemnachricht (`member_join`: `author` ist beigetreten, `content` leer).
+    /// `default` oder Systemnachricht mit leerem `content`: `member_join` (`author` ist beigetreten),
+    /// `call_missed` (`author` hat angerufen), `recipient_add` (`author` hat `mentions` zur Gruppe hinzugefügt).
     pub kind: String,
+    /// Webhook, der die Nachricht gesendet hat (`author` ist dann `null`); `null`, wenn der Webhook
+    /// inzwischen gelöscht ist (`webhook` bleibt mit dem Namen erhalten).
+    pub webhook_id: Option<Uuid>,
+    /// Anzeige eines Webhook-Absenders; `null` bei normalen Nachrichten.
+    pub webhook: Option<WebhookAuthor>,
+    /// Bereinigte Embeds (Karten, ohne Bilder; siehe `embeds`).
+    pub embeds: Vec<Embed>,
+}
+
+/// Absender-Anzeige einer Webhook-Nachricht.
+#[derive(Debug, Clone, Serialize)]
+pub struct WebhookAuthor {
+    /// Anzeigename (aus `username` der Anfrage oder Name des Webhooks).
+    pub name: String,
+    /// Avatar des Lykos-Webhooks (nie eine fremde `avatar_url`), sonst `null`.
+    pub avatar_url: Option<String>,
+}
+
+/// Download-Pfad des Webhook-Avatars (wechselt bei jedem Upload).
+pub fn webhook_avatar_url(webhook_id: Uuid, avatar_id: Option<Uuid>) -> Option<String> {
+    avatar_id.map(|a| format!("/api/webhooks/{webhook_id}/avatar/{a}"))
 }
 
 /// Vorschau der Nachricht, auf die geantwortet wird.
@@ -238,6 +312,9 @@ pub struct Message {
 pub struct MessageReference {
     pub id: Uuid,
     pub author: Option<UserPublic>,
+    /// Name des Webhooks, wenn das Original von einem Webhook stammt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook_name: Option<String>,
     /// Auf 200 Zeichen gekürzt.
     pub content: String,
     pub has_attachments: bool,
@@ -308,12 +385,13 @@ struct UserRow {
     banner_id: Option<Uuid>,
     banner_color: Option<i32>,
     accent_color: Option<i32>,
+    is_bot: bool,
 }
 
 pub async fn user_by_id(db: impl PgExecutor<'_>, id: Uuid) -> ApiResult<Option<User>> {
     let row: Option<UserRow> = sqlx::query_as(
         "SELECT id, username, display_name, is_instance_admin, created_at, avatar_id, bio, status_text,
-                pronouns, banner_id, banner_color, accent_color
+                pronouns, banner_id, banner_color, accent_color, is_bot
          FROM users WHERE id = $1",
     )
     .bind(id)
@@ -332,6 +410,7 @@ pub async fn user_by_id(db: impl PgExecutor<'_>, id: Uuid) -> ApiResult<Option<U
         pronouns: r.pronouns,
         banner_color: r.banner_color,
         accent_color: r.accent_color,
+        bot: r.is_bot,
     }))
 }
 
@@ -378,6 +457,24 @@ pub async fn channels_of(db: impl PgExecutor<'_>, community_id: Uuid) -> ApiResu
     .await?)
 }
 
+pub async fn categories_of(db: impl PgExecutor<'_>, community_id: Uuid) -> ApiResult<Vec<Category>> {
+    Ok(sqlx::query_as(concat!(
+        "SELECT ",
+        category_columns!(),
+        " FROM channel_categories WHERE community_id = $1 ORDER BY position, id"
+    ))
+    .bind(community_id)
+    .fetch_all(db)
+    .await?)
+}
+
+pub async fn category_by_id(db: impl PgExecutor<'_>, id: Uuid) -> ApiResult<Option<Category>> {
+    Ok(sqlx::query_as(concat!("SELECT ", category_columns!(), " FROM channel_categories WHERE id = $1"))
+        .bind(id)
+        .fetch_optional(db)
+        .await?)
+}
+
 pub async fn channel_by_id(db: impl PgExecutor<'_>, id: Uuid) -> ApiResult<Option<Channel>> {
     Ok(sqlx::query_as(concat!("SELECT ", channel_columns!(), " FROM channels WHERE id = $1"))
         .bind(id)
@@ -413,12 +510,13 @@ struct MemberRow {
     nickname: Option<String>,
     joined_at: OffsetDateTime,
     role_ids: Vec<Uuid>,
+    is_bot: bool,
 }
 
 impl From<MemberRow> for Member {
     fn from(r: MemberRow) -> Self {
         Member {
-            user: UserPublic::new(r.user_id, r.username, r.display_name, r.avatar_id),
+            user: UserPublic::new(r.user_id, r.username, r.display_name, r.avatar_id).with_bot(r.is_bot),
             nickname: r.nickname,
             role_ids: r.role_ids,
             joined_at: r.joined_at,
@@ -428,7 +526,7 @@ impl From<MemberRow> for Member {
 
 macro_rules! member_select {
     () => {
-        "SELECT m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at,
+        "SELECT m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at, u.is_bot,
         COALESCE(array_agg(mr.role_id) FILTER (WHERE mr.role_id IS NOT NULL), '{}') AS role_ids
      FROM members m
      JOIN users u ON u.id = m.user_id
@@ -440,7 +538,7 @@ pub async fn members_of(db: impl PgExecutor<'_>, community_id: Uuid) -> ApiResul
     let rows: Vec<MemberRow> = sqlx::query_as(concat!(
         member_select!(),
         " WHERE m.community_id = $1
-         GROUP BY m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at
+         GROUP BY m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at, u.is_bot
          ORDER BY lower(u.username)"
     ))
     .bind(community_id)
@@ -453,7 +551,7 @@ pub async fn member(db: impl PgExecutor<'_>, community_id: Uuid, user_id: Uuid) 
     let row: Option<MemberRow> = sqlx::query_as(concat!(
         member_select!(),
         " WHERE m.community_id = $1 AND m.user_id = $2
-         GROUP BY m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at"
+         GROUP BY m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at, u.is_bot"
     ))
     .bind(community_id)
     .bind(user_id)
@@ -473,13 +571,13 @@ struct MembershipRow {
 pub async fn memberships_of(db: impl PgExecutor<'_>, user_id: Uuid) -> ApiResult<Vec<(Uuid, Member)>> {
     // Wie `member_select!`, zusätzlich mit `community_id`.
     let rows: Vec<MembershipRow> = sqlx::query_as(
-        "SELECT m.community_id, m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at,
+        "SELECT m.community_id, m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at, u.is_bot,
             COALESCE(array_agg(mr.role_id) FILTER (WHERE mr.role_id IS NOT NULL), '{}') AS role_ids
          FROM members m
          JOIN users u ON u.id = m.user_id
          LEFT JOIN member_roles mr ON mr.community_id = m.community_id AND mr.user_id = m.user_id
          WHERE m.user_id = $1
-         GROUP BY m.community_id, m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at",
+         GROUP BY m.community_id, m.user_id, u.username, u.display_name, u.avatar_id, m.nickname, m.joined_at, u.is_bot",
     )
     .bind(user_id)
     .fetch_all(db)
@@ -513,6 +611,12 @@ struct MessageRow {
     mention_everyone: bool,
     pinned_at: Option<OffsetDateTime>,
     kind: String,
+    author_is_bot: Option<bool>,
+    ref_webhook_name: Option<String>,
+    webhook_id: Option<Uuid>,
+    webhook_name: Option<String>,
+    webhook_avatar_id: Option<Uuid>,
+    embeds: sqlx::types::Json<Vec<Embed>>,
 }
 
 fn user_public(
@@ -532,14 +636,23 @@ impl From<MessageRow> for Message {
         let referenced_message = r.ref_id.map(|id| MessageReference {
             id,
             author: user_public(r.ref_author_id, r.ref_username, r.ref_display_name, r.ref_avatar_id),
+            webhook_name: r.ref_webhook_name,
             content: r.ref_content.unwrap_or_default(),
             has_attachments: r.ref_has_attachments.unwrap_or(false),
+        });
+        let webhook = r.webhook_name.map(|name| WebhookAuthor {
+            name,
+            avatar_url: r.webhook_id.and_then(|id| webhook_avatar_url(id, r.webhook_avatar_id)),
         });
         Message {
             id: r.id,
             channel_id: r.channel_id,
             community_id: r.community_id,
-            author: user_public(r.author_id, r.username, r.display_name, r.avatar_id),
+            author: user_public(r.author_id, r.username, r.display_name, r.avatar_id)
+                .map(|a| a.with_bot(r.author_is_bot.unwrap_or(false))),
+            webhook_id: r.webhook_id,
+            webhook,
+            embeds: r.embeds.0,
             content: r.content,
             created_at: r.created_at,
             edited_at: r.edited_at,
@@ -586,10 +699,13 @@ macro_rules! message_select {
                  '[]'::json) AS reactions,
         COALESCE((SELECT array_agg(mm.user_id ORDER BY mm.user_id) FROM message_mentions mm
                   WHERE mm.message_id = msg.id), '{}') AS mentions,
-        msg.mention_everyone, msg.pinned_at, msg.kind
+        msg.mention_everyone, msg.pinned_at, msg.kind, u.is_bot AS author_is_bot,
+        ref.webhook_name AS ref_webhook_name, msg.webhook_id, msg.webhook_name,
+        wh.avatar_id AS webhook_avatar_id, msg.embeds
      FROM messages msg
      JOIN channels c ON c.id = msg.channel_id
      LEFT JOIN users u ON u.id = msg.author_id
+     LEFT JOIN webhooks wh ON wh.id = msg.webhook_id
      LEFT JOIN messages ref ON ref.id = msg.reply_to_id AND ref.channel_id = msg.channel_id
      LEFT JOIN users ru ON ru.id = ref.author_id"
         )
@@ -721,6 +837,7 @@ pub async fn search_messages(
     let rows: Vec<MessageRow> = sqlx::query_as(concat!(
         message_select!("$6"),
         " WHERE msg.channel_id = ANY($1)
+           AND msg.kind <> 'automod_alert'
            AND (to_tsvector('german', msg.content) @@ to_tsquery('german', $2)
                 OR to_tsvector('simple', msg.content) @@ to_tsquery('simple', $2))
            AND ($3::uuid IS NULL OR msg.author_id = $3)

@@ -58,22 +58,44 @@ test('Hierarchie: wer steht unter mir?', () => {
 })
 
 test('Mitglieder: Einträge ohne Recht werden ausgeblendet', () => {
-  assert.deepEqual(memberRules(base), { message: true, nickname: false, roles: false, kick: false })
+  assert.deepEqual(memberRules(base), { message: true, nickname: false, roles: false, kick: false, ban: false })
   const self = memberRules({ ...base, isSelf: true, myPerms: P.CHANGE_NICKNAME })
   assert.equal(self.message, false)
   assert.equal(self.nickname, true)
   assert.equal(self.kick, false)
+  assert.equal(memberRules({ ...base, isSelf: true, myPerms: P.BAN_MEMBERS, myRoleIds: ['mod'] }).ban, false)
 
-  const mod = { ...base, myPerms: P.KICK_MEMBERS | P.MANAGE_NICKNAMES | P.MANAGE_ROLES, myRoleIds: ['mod'] }
-  assert.deepEqual(memberRules({ ...mod, targetRoleIds: ['member'] }), { message: true, nickname: true, roles: true, kick: true })
-  // Höherrangiges Mitglied: Nickname nicht, Entfernen schon (Server prüft beim Kick keine Hierarchie).
+  const mod = {
+    ...base,
+    myPerms: P.KICK_MEMBERS | P.BAN_MEMBERS | P.MANAGE_NICKNAMES | P.MANAGE_ROLES,
+    myRoleIds: ['mod'],
+  }
+  assert.deepEqual(memberRules({ ...mod, targetRoleIds: ['member'] }), {
+    message: true,
+    nickname: true,
+    roles: true,
+    kick: true,
+    ban: true,
+  })
+  // Höherrangiges oder gleichrangiges Mitglied: weder Nickname noch Bann (Hierarchie wie auf dem Server).
   assert.equal(memberRules({ ...mod, targetRoleIds: ['admin'] }).nickname, false)
+  assert.equal(memberRules({ ...mod, targetRoleIds: ['admin'] }).ban, false)
+  assert.equal(memberRules({ ...mod, targetRoleIds: ['mod'] }).ban, false)
+  // Ohne Recht kein Bann.
+  assert.equal(memberRules({ ...mod, myPerms: P.KICK_MEMBERS, targetRoleIds: ['member'] }).ban, false)
   // Besitzer kann niemand entfernen oder umbenennen.
   const owner = memberRules({ ...mod, targetIsOwner: true })
   assert.equal(owner.kick, false)
+  assert.equal(owner.ban, false)
   assert.equal(owner.nickname, false)
   // Kein Mitglied (z. B. DM-Partner): nur Nachricht.
-  assert.deepEqual(memberRules({ ...mod, targetRoleIds: undefined }), { message: true, nickname: false, roles: false, kick: false })
+  assert.deepEqual(memberRules({ ...mod, targetRoleIds: undefined }), {
+    message: true,
+    nickname: false,
+    roles: false,
+    kick: false,
+    ban: false,
+  })
 })
 
 test('Rollen-Untermenü: Hierarchie und eigene Rechte', () => {
@@ -112,6 +134,9 @@ test('Kanäle und Communities', () => {
   assert.equal(voice.connect, true)
   assert.equal(voice.edit, true)
   assert.equal(voice.delete, false)
+  // Webhooks verwalten öffnet die Kanal-Einstellungen (Tab „Integrationen“) – nur bei Textkanälen.
+  assert.equal(channelRules({ channelPerms: P.MANAGE_WEBHOOKS, communityPerms: 0, kind: 'text' }).edit, true)
+  assert.equal(channelRules({ channelPerms: P.MANAGE_WEBHOOKS, communityPerms: 0, kind: 'voice' }).edit, false)
 
   assert.deepEqual(communityRules(0, false), { invite: false, createChannel: false, leave: true, delete: false })
   assert.deepEqual(communityRules(P.ADMINISTRATOR, true), { invite: true, createChannel: true, leave: false, delete: true })
@@ -119,5 +144,11 @@ test('Kanäle und Communities', () => {
     communityTabs(P.KICK_MEMBERS, false).map((t) => t.id),
     ['overview', 'members', 'danger'],
   )
-  assert.equal(communityTabs(P.ADMINISTRATOR, true).length, 8)
+  assert.deepEqual(
+    communityTabs(P.BAN_MEMBERS, false).map((t) => t.id),
+    ['overview', 'members', 'bans', 'danger'],
+  )
+  assert.equal(communityTabs(P.ADMINISTRATOR, true).length, 10)
+  assert.ok(communityTabs(P.MANAGE_COMMUNITY, false).some((t) => t.id === 'automod'))
+  assert.ok(!communityTabs(P.MANAGE_ROLES, false).some((t) => t.id === 'automod'))
 })

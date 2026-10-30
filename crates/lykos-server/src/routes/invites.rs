@@ -18,6 +18,7 @@ use crate::{
     models::{self, Invite},
     permissions::{self, Permissions},
     routes::{
+        bans,
         communities::{self, CommunityDetail},
         customization,
     },
@@ -332,6 +333,10 @@ pub async fn join_via_invite(
     .fetch_optional(&mut *conn)
     .await?;
     let (community_id,) = invite.ok_or(ApiError::NotFound("invalid_invite"))?;
+    // Gebannte kommen über keine Einladung zurück, bis der Bann aufgehoben ist.
+    if bans::is_banned(&mut *conn, community_id, user_id).await? {
+        return Err(ApiError::Forbidden("banned"));
+    }
 
     let inserted =
         sqlx::query("INSERT INTO members (community_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")

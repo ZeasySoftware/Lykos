@@ -16,17 +16,27 @@ zusätzlich im Body (`token`) – außer für den eigenen Web-Client (`Origin` =
 Dev-Client und Werkzeuge ohne `Origin` erhalten es weiter.
 Sessions laufen 30 Tage nach der letzten Nutzung ab und sind jederzeit widerrufbar.
 
+**Bots** (siehe „Bot-Konten“ und `docs/bots.md`) authentifizieren sich mit `Authorization: Bot <token>` (Token mit
+Präfix `lykb_`) – für REST und Gateway. Sie haben keine Session, kein Passwort und keine 2FA. Konto-, Sicherheits-,
+Freundes- und Verwaltungs-Endpunkte sind für Bots zentral gesperrt (`403 bots_not_allowed`): alles unter `/auth/*`
+außer `GET /auth/me`, `/relationships*`, `POST /dms`, `/dms/contacts`, `/dms/settings`, `/bots*`, `/admin/*`,
+`/feedback*`, Voice (`/voice/*`, `/channels/{id}/voice/*`, `/channels/{id}/call/*`), `POST /communities`,
+`POST /invites/{code}/accept` und `POST /communities/{id}/transfer`. Alles andere läuft über dieselben
+Rechteprüfungen und Rate-Limits wie bei Menschen.
+
+**Webhooks** (siehe „Eingehende Webhooks“) brauchen keine Anmeldung: Das Token (Präfix `lykw_`) steht in der URL.
+
 ## Fehler
 
 Fehler antworten mit passendem Status und `{ "error": "<code>" }`.
 
 | Status | Codes |
 |---|---|
-| 400 | `invalid_username`, `invalid_password`, `invalid_name`, `invalid_content`, `invalid_kind`, `invalid_request`, `not_a_text_channel`, `too_many_attachments`, `invalid_attachments`, `not_a_voice_channel`, `invalid_reply`, `invalid_emoji`, `too_many_reactions`, `too_many_pins`, `invalid_image`, `invalid_bio`, `invalid_status_text`, `too_many_recipients`, `not_a_group_dm`, `cannot_leave_dm`, `invalid_email`, `email_unavailable` (kein Mailversand bzw. keine bestätigte Adresse), `email_unchanged`, `invalid_token` (Link ungültig/abgelaufen/verbraucht), `invalid_code`, `totp_not_started`, `invalid_title`, `invalid_description`, `invalid_tech_info`, `invalid_status`, `not_a_suggestion`, `invalid_pronouns`, `invalid_color`, `invalid_channel`, `too_many_emojis`, `invalid_bitrate`, `invalid_user_limit`, `not_in_call` |
-| 401 | `unauthorized`, `invalid_credentials`, `invalid_code` (2FA-Code falsch), `invalid_mfa_token` (zweiter Anmeldeschritt abgelaufen/verbraucht) |
-| 403 | `forbidden`, `registration_closed`, `invite_required`, `wrong_password` (Passwortbestätigung falsch), `dm_not_allowed`, `friend_request_not_allowed`, `mfa_code_required`, `invalid_code` (Re-Authentifizierung), `reauth_required` (Konto ohne Passwort: Sitzung älter als 10 min), `account_disabled` (Konto gesperrt), `channel_full` (Sprachkanal hat sein Nutzerlimit erreicht), `call_not_allowed` (1:1-DM mit Blockade: kein Anruf) |
-| 404 | `not_found`, `invalid_invite`, `invalid_reset_token` |
-| 409 | `username_taken`, `already_member`, `owner_cannot_leave`, `owns_communities`, `last_instance_admin`, `email_taken`, `email_mfa_active`, `email_mfa_already_enabled`, `email_mfa_not_enabled`, `totp_already_enabled`, `totp_not_enabled`, `mfa_not_enabled`, `identity_in_use`, `last_login_method`, `already_voted`, `screenshot_exists`, `issue_exists`, `emoji_name_taken`, `already_friends`, `user_blocked`, `too_many_pending_requests` |
+| 400 | `invalid_username`, `invalid_password`, `invalid_name`, `invalid_content`, `invalid_kind`, `invalid_request`, `not_a_text_channel`, `too_many_attachments`, `invalid_attachments`, `not_a_voice_channel`, `invalid_reply`, `invalid_emoji`, `too_many_reactions`, `too_many_pins`, `invalid_image`, `invalid_bio`, `invalid_status_text`, `too_many_recipients`, `not_a_group_dm`, `cannot_leave_dm`, `invalid_email`, `email_unavailable` (kein Mailversand bzw. keine bestätigte Adresse), `email_unchanged`, `invalid_token` (Link ungültig/abgelaufen/verbraucht), `invalid_code`, `totp_not_started`, `invalid_title`, `invalid_description`, `invalid_tech_info`, `invalid_status`, `not_a_suggestion`, `invalid_pronouns`, `invalid_color`, `invalid_channel`, `too_many_emojis`, `invalid_bitrate`, `invalid_user_limit`, `not_in_call`, `cannot_ban_self`, `invalid_reason`, `invalid_welcome_message`, `too_many_dm_pins`, `invalid_keyword`, `invalid_domain`, `invalid_limit`, `invalid_message`, `invalid_actions`, `alert_channel_required` (AutoMod-Verwaltung), `invalid_embeds`, `empty_message` (Webhook ohne Text und Embeds), `attachments_not_supported` (Webhook mit Dateien), `invalid_json` |
+| 401 | `unauthorized`, `invalid_credentials`, `invalid_code` (2FA-Code falsch), `invalid_mfa_token` (zweiter Anmeldeschritt abgelaufen/verbraucht), `invalid_webhook_token` |
+| 403 | `forbidden`, `registration_closed`, `invite_required`, `wrong_password` (Passwortbestätigung falsch), `dm_not_allowed`, `friend_request_not_allowed`, `mfa_code_required`, `invalid_code` (Re-Authentifizierung), `reauth_required` (Konto ohne Passwort: Sitzung älter als 10 min), `account_disabled` (Konto gesperrt), `channel_full` (Sprachkanal hat sein Nutzerlimit erreicht), `call_not_allowed` (1:1-DM mit Blockade: kein Anruf), `banned` (in der Community gebannt: Einladung annehmen geht nicht), `automod_blocked` (Nachricht vom AutoMod blockiert, siehe „AutoMod“), `bots_not_allowed` (Endpunkt für Bots gesperrt), `bots_disabled` (Instanz erlaubt keine Bots) |
+| 404 | `not_found`, `invalid_invite`, `invalid_reset_token`, `unknown_webhook`, `unknown_message` (keine Nachricht dieses Webhooks), `unknown_bot` |
+| 409 | `username_taken`, `already_member`, `owner_cannot_leave`, `owns_communities`, `last_instance_admin`, `email_taken`, `email_mfa_active`, `email_mfa_already_enabled`, `email_mfa_not_enabled`, `totp_already_enabled`, `totp_not_enabled`, `mfa_not_enabled`, `identity_in_use`, `last_login_method`, `already_voted`, `screenshot_exists`, `issue_exists`, `emoji_name_taken`, `already_friends`, `user_blocked`, `too_many_pending_requests`, `too_many_webhooks` (15 je Kanal), `too_many_bots` (10 je Nutzer) |
 | 429 | `rate_limited` – mit Header `Retry-After: <Sekunden>` |
 | 413 | `file_too_large`, `quota_exceeded` (Speicher-Kontingent von Nutzer oder Community erschöpft) |
 | 503 | `voice_unavailable` (LiveKit nicht konfiguriert), `oidc_unavailable` (Anmeldeanbieter nicht erreichbar), `gitea_not_configured`, `gitea_unavailable` (Feedback-Weiterleitung) |
@@ -37,25 +47,40 @@ Fehler antworten mit passendem Status und `{ "error": "<code>" }`.
 User      { id, username, display_name: string | null, is_instance_admin: boolean, created_at,
             avatar_url: string | null, bio: string | null, status_text: string | null,
             pronouns: string | null, banner_url: string | null, banner_color: number | null,
-            accent_color: number | null }
+            accent_color: number | null, bot?: true }
 Session   { id, label: string | null, created_at, last_used_at, expires_at, current: boolean }
 Community { id, name, owner_id, message_retention_days: number | null, upload_quota_mb: number | null, created_at,
             icon_url: string | null, banner_url: string | null, description: string | null,
-            accent_color: number | null, system_channel_id: string | null }
+            accent_color: number | null, system_channel_id: string | null,
+            join_messages_enabled: boolean, welcome_message: string | null,
+            afk_channel_id: string | null, afk_timeout_seconds: 60 | 300 | 900 | 1800 | 3600 }
+Ban       { user: UserPublic, reason: string | null, banned_by: UserPublic | null, created_at }
 Channel   { id, community_id: string | null, name, kind: 'text' | 'voice' | 'dm' | 'group_dm', topic: string | null, position: number,
             audio_bitrate: number /* kbit/s, 32–256, Standard 64 */, audio_stereo: boolean, audio_dtx: boolean, audio_red: boolean,
-            user_limit: number | null /* 1–99, null = unbegrenzt */ }   // audio_*/user_limit nur bei Sprachkanälen wirksam
+            user_limit: number | null /* 1–99, null = unbegrenzt */,
+            category_id: string | null /* Kategorie; null = ohne (oben) bzw. DM */ }   // audio_*/user_limit nur bei Sprachkanälen wirksam
+Category  { id, community_id, name, position: number }
 Role      { id, community_id, name, permissions: number, position: number, color: number | null, is_default: boolean }
 Member    { user: UserPublic, nickname: string | null, role_ids: string[], joined_at }
-UserPublic{ id, username, display_name: string | null, avatar_url: string | null }
+UserPublic{ id, username, display_name: string | null, avatar_url: string | null, bot?: true /* nur bei Bots; gesetzt bei Mitgliedern und Nachrichten-Autoren */ }
 UserProfile{ id, username, display_name: string | null, avatar_url: string | null, bio: string | null,
             status_text: string | null, pronouns: string | null, banner_url: string | null,
-            banner_color: number | null, accent_color: number | null, created_at }
+            banner_color: number | null, accent_color: number | null, created_at, bot?: true }
 Message   { id, channel_id, community_id: string | null /* null in DMs */, author: UserPublic | null, content, created_at,
             edited_at: string | null, attachments: Attachment[], reply_to_id: string | null,
             referenced_message: MessageReference | null, reactions: Reaction[], mentions: string[],
-            mention_everyone: boolean, pinned_at: string | null, kind: 'default' | 'member_join' | 'call_missed' }
-MessageReference { id, author: UserPublic | null, content /* max. 200 Zeichen */, has_attachments: boolean }
+            mention_everyone: boolean, pinned_at: string | null,
+            kind: 'default' | 'member_join' | 'call_missed' | 'recipient_add' | 'automod_alert',
+            webhook_id: string | null /* null auch, wenn der Webhook gelöscht ist */,
+            webhook: { name, avatar_url: string | null } | null /* Absender einer Webhook-Nachricht; author ist dann null */,
+            embeds: Embed[] }
+MessageReference { id, author: UserPublic | null, webhook_name?: string /* Original von einem Webhook */,
+            content /* max. 200 Zeichen */, has_attachments: boolean }
+Embed     { title?, description?, url? /* http(s) */, color?: number /* 0xRRGGBB */, timestamp? /* RFC 3339 */,
+            fields?: { name, value, inline: boolean }[], author?: { name, url? }, footer?: { text } }   // nie Bilder
+Webhook   { id, community_id, channel_id, name, avatar_url: string | null, created_by: UserPublic | null, created_at }
+Bot       { id /* = Nutzer-ID */, username, display_name: string | null, avatar_url: string | null,
+            description: string | null, is_public: boolean, owner_id, created_at }
 Reaction  { emoji /* Unicode oder `name:id` */, count: number, me: boolean, emoji_id: string | null, animated: boolean }
 CustomEmoji { id, community_id, name, animated: boolean, url /* /api/emojis/{id}.{png|gif|webp} */,
             uploader: UserPublic | null, created_at }
@@ -68,7 +93,8 @@ VoiceState{ community_id: string | null /* null in DM-Anrufen */, channel_id, us
 Relationship { id /* ID des anderen Nutzers */, type: 'friend' | 'pending_out' | 'pending_in' | 'blocked',
             user: UserPublic, since /* seit wann in dieser Form */ }
 DmChannel { id, kind: 'dm' | 'group_dm', name: string | null, recipients: UserPublic[] /* inkl. man selbst */,
-            last_message_id: string | null, last_read_message_id: string | null, mention_count: number }
+            last_message_id: string | null, last_read_message_id: string | null, mention_count: number,
+            pinned_at: string | null /* eigener Pin; in geteilten Events immer null */ }
 Feedback  { id, number: number /* Meldungsnummer */, kind: 'bug' | 'suggestion' | 'other',
             status: 'neu' | 'in_arbeit' | 'erledigt' | 'abgelehnt' | 'duplikat', title, description /* Markdown */,
             vote_count: number, voted: boolean, mine: boolean, replies: FeedbackReply[], created_at, updated_at,
@@ -82,16 +108,23 @@ TechInfo  { app_version: string | null, platform: 'web' | 'desktop' | null, os: 
 ```
 
 Audit-Aktionen (`action`, `target_id`, `data`): `community.create` (–, `{name}`), `community.update`
-(–, `{name, message_retention_days, upload_quota_mb, description, accent_color, system_channel_id}`),
+(–, `{name, message_retention_days, upload_quota_mb, description, accent_color, system_channel_id,
+join_messages_enabled, welcome_message, afk_channel_id, afk_timeout_seconds}`),
 `community.icon_set|icon_remove|banner_set|banner_remove` (–, `{}`), `channel.create|update|delete` (Kanal, `{name, kind}`/geänderte Ton-Felder `{audio_bitrate?, audio_stereo?, audio_dtx?, audio_red?, user_limit?}` (sonst `{}`)/`{name}`),
 `channel.override_set` (Kanal, `{role_id, allow, deny}`), `channel.override_delete` (Kanal, `{role_id}`),
 `role.create|update|delete` (Rolle, `{name}`/`{name, permissions}`/`{name}`), `role.reorder` (–, `{role_ids}`),
 `member.join|leave|kick`
-(Nutzer), `member.role_add|role_remove` (Nutzer, `{role_id}`), `invite.create|delete` (–, `{code}`),
+(Nutzer), `member.ban` (Nutzer, `{reason, delete_message_seconds}`), `member.unban` (Nutzer, `{}`), `member.role_add|role_remove` (Nutzer, `{role_id}`), `invite.create|delete` (–, `{code}`),
 `message.delete` (Nachricht, `{channel_id, author_id}` – nur Moderation, ohne Inhalt),
 `message.pin|unpin` (Nachricht, `{channel_id, author_id}`), `member.nickname` (Nutzer,
 `{nickname}` – nur fremde Änderungen), `community.transfer` (neuer Besitzer, `{from}`),
-`emoji.create|update|delete` (Emote, `{name}`/`{name, old_name}`/`{name}`).
+`emoji.create|update|delete` (Emote, `{name}`/`{name, old_name}`/`{name}`),
+`category.create|update|delete` (Kategorie, `{name}`/`{name, position}`/`{name}`), `category.reorder` (–, `{category_ids}`).
+`community.create` trägt bei Import aus einer Discord-Vorlage zusätzlich `discord_template` (Code), `channel.create`
+zusätzlich `category_id`, `channel.update` bei Kategoriewechsel `category_id`.
+`webhook.create` (Webhook, `{name, channel_id}`), `webhook.update` (Webhook, geänderte Felder `{name?, channel_id?,
+from_channel_id?}` bzw. `{avatar: boolean}`), `webhook.token_reset` (Webhook, `{}`), `webhook.delete` (Webhook,
+`{name, channel_id}`), `bot.add` (Bot, `{username}`). `message.delete` enthält zusätzlich `webhook_id`.
 
 ## Berechtigungen (Bitflags, `permissions: number`)
 
@@ -114,6 +147,8 @@ Audit-Aktionen (`action`, `target_id`, `data`): `community.create` (–, `{name}
 | 1 << 14 | `ADD_REACTIONS` | Emoji-Reaktionen hinzufügen (eigene entfernen geht immer) |
 | 1 << 15 | `MENTION_EVERYONE` | `@everyone` benachrichtigt alle (ohne das Recht bleibt es normaler Text) |
 | 1 << 16 | `MANAGE_EMOJIS` | Custom-Emotes der Community hochladen, umbenennen, löschen |
+| 1 << 17 | `BAN_MEMBERS` | Mitglieder bannen, Banns aufheben, Bannliste sehen |
+| 1 << 18 | `MANAGE_WEBHOOKS` | Webhooks der Textkanäle anlegen, ändern, Token neu erzeugen, löschen (kanalbezogen) |
 | 1 << 20 | `ADMINISTRATOR` | Alles |
 | 1 << 21 | `CHANGE_NICKNAME` | Eigenen Nickname in der Community ändern |
 | 1 << 22 | `MANAGE_NICKNAMES` | Nicknames anderer Mitglieder ändern (nicht den des Besitzers) |
@@ -126,7 +161,8 @@ Rolle verwalten (siehe „Rollen“ → Hierarchie).
 
 Standardrolle neuer Communities: `VIEW_CHANNEL | SEND_MESSAGES | ATTACH_FILES | CONNECT | SPEAK | STREAM | VIDEO | ADD_REACTIONS | CREATE_INVITES | CHANGE_NICKNAME`.
 Migration `0007` hat `VIDEO`, Migration `0008` `ADD_REACTIONS` und Migration `0009` `CHANGE_NICKNAME` auch allen bestehenden Standardrollen hinzugefügt.
-`MENTION_EVERYONE` und `MANAGE_EMOJIS` (Migration `0014`) sind bewusst nicht in der Standardrolle.
+`MENTION_EVERYONE`, `MANAGE_EMOJIS` (Migration `0014`), `BAN_MEMBERS` und `MANAGE_WEBHOOKS` (Migration `0026`) sind
+bewusst nicht in der Standardrolle; Migration `0024` hat `BAN_MEMBERS` allen Rollen gegeben, die schon `KICK_MEMBERS` hatten.
 
 ## Endpunkte
 
@@ -192,7 +228,7 @@ Rate-Limits (pro Server-Instanz im Speicher; IPs werden weder gespeichert noch g
 | `POST /auth/password/forgot` | 5 Anfragen pro Client-IP (→ 429); 3 Reset-Mails pro Konto (darüber still keine Mail) | 1 h |
 | Bestätigungsmails, E-Mail-Codes | 5 pro Konto (→ 429); je E-Mail-Code höchstens 5 Versuche | 1 h |
 | `POST /relationships`, `PUT`/`DELETE /relationships/{user_id}` | 30 pro Nutzer (zusammen) | 1 min |
-| `POST /dms` | 10 pro Nutzer | 1 min |
+| `POST /dms`, `POST /dms/{id}/recipients` | 10 pro Nutzer (zusammen) | 1 min |
 | `POST /channels/{id}/messages` | 120 pro Nutzer über alle Kanäle (kurze Schübe sind möglich) | 1 min |
 
 Ist ein Limit erreicht, antwortet der Server mit 429 `rate_limited` – bei der Anmeldung auch für
@@ -281,7 +317,9 @@ nebenbei Metadaten wie EXIF/GPS. Das alte Bild wird beim Ersetzen/Entfernen sofo
   relationships: Relationship[], privacy: { friend_requests: 'everyone' | 'mutual_communities' | 'nobody' },
   memberships: { community_id, community_name, is_owner, nickname, joined_at, roles: string[] }[],
   messages: { id, community_id, community_name, channel_id, channel_name, content, created_at, edited_at }[],
-  attachments: { id, community_name, channel_name, message_id, filename, content_type, size_bytes, width, height, created_at }[] }
+  attachments: { id, community_name, channel_name, message_id, filename, content_type, size_bytes, width, height, created_at }[],
+  community_bans: { received: ExportBan[], issued: ExportBan[] } }
+// ExportBan = { community_id, community_name, user_id /* gebannter Nutzer */, reason, created_at }
 ```
 
 Anhänge erscheinen nur als Metadaten (eigene Uploads); keine Passwort-/Token-Hashes. `profile` enthält auch
@@ -304,9 +342,10 @@ Community der Einladung direkt bei.
 | Methode | Pfad | Recht | Antwort |
 |---|---|---|---|
 | GET | `/communities` | – | `Community[]` (eigene) |
-| POST | `/communities` | – | `CommunityDetail` – legt Standardrolle, `#allgemein` (Text) und `Sprachkanal` (Voice) an; ist `allow_community_creation` aus, nur für Instanz-Admins (sonst `403 community_creation_disabled`) |
+| POST | `/communities` | – | `{ name?, discord_template? }` → `CommunityDetail` – legt Standardrolle, `#allgemein` (Text, zugleich Systemkanal) und `Sprachkanal` (Voice) an bzw. mit `discord_template` die Struktur der Vorlage (siehe unten; `name` dann optional, Vorgabe = Name der Vorlage); ist `allow_community_creation` aus, nur für Instanz-Admins (sonst `403 community_creation_disabled`) |
+| GET | `/communities/templates/discord/{code}` | wie Anlegen | `DiscordTemplatePreview` – Vorschau einer Discord-Servervorlage |
 | GET | `/communities/{id}` | Mitglied | `CommunityDetail` |
-| PATCH | `/communities/{id}` | `MANAGE_COMMUNITY` | `{ name?, message_retention_days?, upload_quota_mb?, description?, accent_color?, system_channel_id? }` → `Community` (`message_retention_days: null` = unbegrenzt; `upload_quota_mb`: 1–10 000 000 oder `null` = kein Community-Kontingent; Gestaltung siehe unten) |
+| PATCH | `/communities/{id}` | `MANAGE_COMMUNITY` | `{ name?, message_retention_days?, upload_quota_mb?, description?, accent_color?, system_channel_id?, join_messages_enabled?, welcome_message?, afk_channel_id?, afk_timeout_seconds? }` → `Community` (`message_retention_days: null` = unbegrenzt; `upload_quota_mb`: 1–10 000 000 oder `null` = kein Community-Kontingent; Gestaltung und AFK-Kanal siehe unten) |
 | POST | `/communities/{id}/icon` | `MANAGE_COMMUNITY` | `multipart/form-data`, Feld `file` → `Community` |
 | DELETE | `/communities/{id}/icon` | `MANAGE_COMMUNITY` | `Community` |
 | POST | `/communities/{id}/banner` | `MANAGE_COMMUNITY` | `multipart/form-data`, Feld `file` → `Community` |
@@ -318,16 +357,58 @@ Community der Einladung direkt bei.
 | GET | `/communities/{id}/members` | Mitglied | `Member[]` |
 | DELETE | `/communities/{id}/members/{user_id}` | selbst oder `KICK_MEMBERS` (fremde nur, wenn deren höchste Rolle echt unter der eigenen steht; Besitzer immer) | 204 |
 | PATCH | `/communities/{id}/members/{user_id}` bzw. `/members/@me` | siehe unten | `{ nickname: string \| null }` → `Member` |
+| GET | `/communities/{id}/bans` | `BAN_MEMBERS` | `Ban[]` (neueste zuerst) |
+| PUT | `/communities/{id}/bans/{user_id}` | `BAN_MEMBERS` (Hierarchie wie beim Rauswerfen) | `{ reason?, delete_message_seconds? }` → 204 |
+| DELETE | `/communities/{id}/bans/{user_id}` | `BAN_MEMBERS` | 204 (kein Bann → 404) |
 | POST | `/communities/{id}/transfer` | Besitzer | `{ user_id }` → `Community` – Besitz übertragen (Ziel muss Mitglied sein, sonst 404) |
 | PUT | `/communities/{id}/members/{user_id}/roles/{role_id}` | `MANAGE_ROLES` | 204 |
 | DELETE | `/communities/{id}/members/{user_id}/roles/{role_id}` | `MANAGE_ROLES` | 204 |
 | GET | `/communities/{id}/audit-log?before=&limit=` | `VIEW_AUDIT_LOG` | `AuditEntry[]` |
+
+**Import aus Discord-Servervorlagen:** `discord_template` bzw. `{code}` ist der Vorlagen-Code oder ein Link
+(`https://discord.new/CODE`, `https://discord.com/template/CODE`, auch `discordapp.com`/`discord.gg`); andere Hosts
+und Formen → `400 invalid_template_code`. Der Server holt die Vorlage selbst über die Discord-API (kein freier
+URL-Abruf, keine Weiterleitungen, 10 s, max. 2 MB; Rate-Limit 20 Abrufe pro Nutzer in 10 min → `429`).
+Fehler: `404 template_not_found`, `503 template_fetch_failed` (Discord nicht erreichbar), `400 invalid_template`
+(unlesbar oder mehr als 250 Rollen/500 Kanäle). Übernommen werden in einer Transaktion: Rollen (Name, Farbe,
+Reihenfolge, Rechte; `@everyone` → Rechte der Standardrolle), Kategorien, Kanäle (Typ 0/5 → Text, 2/13 → Sprache,
+15/16 Forum/Medien → Text; Thema, Position, Nutzerlimit und Bitrate auf die Lykos-Grenzen geklemmt), Rechte-Overrides
+je Rolle, Systemkanal und Beschreibung. Namen werden nach den Lykos-Regeln gekürzt. Rechte ohne Entsprechung
+(Bannen, Webhooks, Threads, …), Overrides an Kategorien, Rollen-Optionen und der AFK-Kanal fallen weg.
+
+```ts
+DiscordTemplatePreview { code, name, description: string | null,
+  counts: { roles, categories, text_channels, voice_channels },
+  roles: { name, color: number | null }[] /* höchste zuerst */,
+  channels: TemplateChannel[] /* ohne Kategorie */, categories: { name, channels: TemplateChannel[] }[],
+  notes: string[] /* Hinweise, was nicht übernommen wird */ }
+TemplateChannel { name, kind: 'text' | 'voice', from_forum: boolean }
+```
 
 **Nickname:** eigener mit `CHANGE_NICKNAME` (oder `MANAGE_NICKNAMES`), fremder mit `MANAGE_NICKNAMES`;
 den Nickname des Besitzers ändert nur er selbst. Fremde Nicknames folgen der Rollenhierarchie: Wer nicht
 Besitzer ist, ändert sie nur bei Mitgliedern, deren höchste Rolle echt unter der eigenen höchsten steht (Mitglieder
 nur mit Standardrolle stehen unter jeder Rolle; ohne eigene Rolle → `403`). 1–32 Zeichen, eine Zeile; `null`/leer entfernt ihn.
 Fremde Änderungen landen im Audit-Log (`member.nickname`). Anzeige im Client: Nickname > `display_name` > `username`.
+
+**Banns:** Gebannte verlieren sofort die Mitgliedschaft – wie beim Rauswerfen `MEMBER_REMOVE`, Ende des Gateway-Abos
+der Community und Rauswurf aus deren Sprachkanal – und können über keine Einladung wieder beitreten
+(`POST /invites/{code}/accept` → `403 banned`), bis der Bann aufgehoben ist. Wie beim Rauswerfen gilt die
+Rollenhierarchie (Besitzer immer); den Besitzer kann niemand bannen (`403`), sich selbst auch nicht
+(`400 cannot_ban_self`). Auch Nicht-Mitglieder lassen sich bannen (z. B. nach dem Verlassen; unbekannte Nutzer → `404`);
+ein erneuter Bann aktualisiert Grund, Moderator und Zeitpunkt. `reason`: max. 512 Zeichen (`invalid_reason`).
+`delete_message_seconds` (0–604 800, also höchstens 7 Tage) löscht alle Nachrichten des Nutzers in der Community aus
+diesem Zeitraum samt Anhängen – in Portionen zu 500, je Nachricht ein `MESSAGE_DELETE` wie beim normalen Löschen.
+Audit-Log: `member.ban` bzw. `member.unban`. Wird das gebannte Konto gelöscht, verschwindet der Bann; wird der Moderator
+gelöscht, bleibt `banned_by: null`. Der Datenexport enthält `community_bans: { received, issued }`.
+
+**AFK-Kanal:** `afk_channel_id` ist ein Sprachkanal derselben Community oder `null` (sonst `400 invalid_channel`; wird
+der Kanal gelöscht, wieder `null`), `afk_timeout_seconds` einer der Werte 60, 300, 900, 1800, 3600 (Standard 300,
+sonst `400 invalid_request`). Im AFK-Kanal hat **niemand** `SPEAK`, `STREAM` oder `VIDEO` – auch Administratoren und
+der Besitzer nicht (Join-Token ohne Quellen; beim Ändern der Einstellung gleicht der Server verbundene Teilnehmer wie
+beim Rechteentzug an). Das Verschieben macht der Client selbst: Spricht man im Sprachkanal einer Community für
+`afk_timeout_seconds` nicht (Sprachaktivierung bzw. Push-to-Talk) und bedient die App nicht, tritt er über den
+normalen Join dem AFK-Kanal bei – nicht beim Streamen, mit Kamera oder in DM-Anrufen.
 
 ### Gestaltung (Community & Profil)
 
@@ -345,7 +426,14 @@ Fremde Änderungen landen im Audit-Log (`member.nickname`). Anzeige im Client: N
   Server bei jedem Beitritt (Einladung annehmen, Registrierung mit Einladung) eine **Systemnachricht**
   `kind: 'member_join'` mit leerem `content` und dem neuen Mitglied als `author` (kommt als normales
   `MESSAGE_CREATE`). Systemnachrichten lassen sich nicht bearbeiten (`400 invalid_request`), aber wie andere
-  Nachrichten löschen. Wird der Kanal gelöscht, wird `system_channel_id` wieder `null`.
+  Nachrichten löschen. Wird der Kanal gelöscht, wird `system_channel_id` wieder `null`. Neue Communities nutzen
+  ihren ersten Textkanal als Systemkanal.
+- `join_messages_enabled`: Beitrittsmeldungen senden (Standard `true`); `false` = keine Systemnachricht.
+- `welcome_message`: eigener Willkommenstext, max. 500 Zeichen (getrimmt, `null`/leer = keiner, sonst
+  `invalid_welcome_message`). Platzhalter: `{user}` → `@benutzername` (zählt als Erwähnung des neuen Mitglieds,
+  `mentions: [user_id]`), `{community}` → Name der Community. Der eingesetzte Text steht dann im `content` der
+  `member_join`-Nachricht (Markdown wie normale Nachrichten); ohne eigenen Text bleibt `content` leer und der Client
+  zeigt einen seiner Standardsätze.
 
 Jeder Upload bekommt eine neue Bild-ID → URLs sind unveränderlich (`Cache-Control: private, max-age=31536000,
 immutable`), das vorige Bild wird sofort gelöscht, alte URLs liefern `404`. Fehler wie beim Avatar
@@ -356,7 +444,7 @@ landet im Audit-Log; beim Löschen der Community werden Icon und Banner sofort m
 öffentlichen Einladungsseite für alle mit einem gültigen Einladungscode (`GET /invites/{code}` liefert sie mit,
 Bilder über `/api/invites/{code}/icon|banner/{bild_id}`, ohne Anmeldung, `Cache-Control: private, max-age=3600`).
 Ohne gültige Einladung (abgelaufen, aufgebraucht, gelöscht) und für Nicht-Mitglieder über den Community-Pfad: `404`.
-`system_channel_id` sehen nur Mitglieder.
+`system_channel_id`, die Willkommens- und AFK-Einstellungen sehen nur Mitglieder.
 
 **Profil** (eigenes Konto, `PATCH /auth/me`, `POST|DELETE /auth/me/banner`):
 
@@ -372,7 +460,7 @@ nicht in `USER_UPDATE`.
 Der Aufräum-Job kennt Avatare, Profilbanner, Community-Icons und -Banner; Dateien ohne Verweis (z. B. nach
 abgebrochenen Vorgängen) entfernt er nach der Schonfrist wie verwaiste Anhänge.
 
-`CommunityDetail = { community, channels: Channel[] (nur sichtbare), roles: Role[], permissions: number (Community-Ebene), channel_permissions: { [channel_id]: number }, read_states: { [channel_id]: message_id }, last_message_ids: { [channel_id]: message_id }, mention_counts: { [channel_id]: number } }`
+`CommunityDetail = { community, channels: Channel[] (nur sichtbare), categories: Category[] (nur mit sichtbarem Kanal; mit MANAGE_CHANNELS alle), roles: Role[], permissions: number (Community-Ebene), channel_permissions: { [channel_id]: number }, read_states: { [channel_id]: message_id }, last_message_ids: { [channel_id]: message_id }, mention_counts: { [channel_id]: number } }`
 
 `read_states` (eigener Lesestand) und `last_message_ids` (neueste Nachricht) gibt es nur für sichtbare
 Textkanäle; Kanäle ohne Lesestand bzw. ohne Nachrichten fehlen in der jeweiligen Map.
@@ -384,8 +472,8 @@ erwähnen oder `mention_everyone` haben; Kanäle ohne solche Nachrichten fehlen.
 ### Kanäle
 | Methode | Pfad | Recht | Body / Antwort |
 |---|---|---|---|
-| POST | `/communities/{id}/channels` | `MANAGE_CHANNELS` | `{ name, kind, topic? }` → `Channel` |
-| PATCH | `/channels/{id}` | `MANAGE_CHANNELS` | `{ name?, topic?, position?, audio_bitrate?, audio_stereo?, audio_dtx?, audio_red?, user_limit? }` → `Channel` |
+| POST | `/communities/{id}/channels` | `MANAGE_CHANNELS` | `{ name, kind, topic?, category_id? }` → `Channel` |
+| PATCH | `/channels/{id}` | `MANAGE_CHANNELS` | `{ name?, topic?, position?, audio_bitrate?, audio_stereo?, audio_dtx?, audio_red?, user_limit?, category_id? }` → `Channel` (`category_id: null` = ohne Kategorie) |
 | DELETE | `/channels/{id}` | `MANAGE_CHANNELS` | 204 |
 | GET | `/channels/{id}/overrides` | `MANAGE_ROLES` | `ChannelOverride[]` = `[{ role_id, allow, deny }]` |
 | PUT | `/channels/{id}/overrides/{role_id}` | `MANAGE_ROLES` | `{ allow, deny }` → 204 |
@@ -401,20 +489,35 @@ bekommt Änderungen erst beim nächsten Beitritt.
 
 Kanalnamen: 1–64 Zeichen. Textkanäle werden kleingeschrieben, Leerzeichen → `-`.
 
+### Kanal-Kategorien
+| Methode | Pfad | Recht | Body / Antwort |
+|---|---|---|---|
+| POST | `/communities/{id}/categories` | `MANAGE_CHANNELS` | `{ name }` → `Category` (ans Ende; max. 100, sonst `409 too_many_categories`) |
+| PATCH | `/categories/{id}` | `MANAGE_CHANNELS` | `{ name?, position? }` → `Category` |
+| DELETE | `/categories/{id}` | `MANAGE_CHANNELS` | 204 – Kanäle bleiben und stehen danach ohne Kategorie |
+| PATCH | `/communities/{id}/categories/order` | `MANAGE_CHANNELS` | `{ category_ids }` (alle, oben zuerst) → `Category[]` |
+
+Kategorien gruppieren nur und tragen keine eigenen Rechte. Ein Mitglied sieht eine Kategorie, wenn es mindestens
+einen ihrer Kanäle sehen darf oder `MANAGE_CHANNELS` hat. Namen: 1–64 Zeichen, Schreibweise bleibt. Kanäle einer
+anderen Community → `400 invalid_category`. Im Client stehen Kanäle ohne Kategorie oben („Textkanäle“/„Sprachkanäle“),
+darunter die Kategorien nach `position`, darin Text- vor Sprachkanälen nach `position`.
+
 ### Nachrichten
 | Methode | Pfad | Recht | Body / Antwort |
 |---|---|---|---|
 | GET | `/channels/{id}/messages?before={message_id}&limit={1..100}` | `VIEW_CHANNEL` | `Message[]`, neueste zuerst |
 | GET | `/channels/{id}/messages?around={message_id}&limit={1..100}` | `VIEW_CHANNEL` | `Message[]` um die Nachricht herum (bis `limit/2` neuere, Rest inkl. `around` und älter), neueste zuerst |
 | GET | `/channels/{id}/messages?after={message_id}&limit={1..100}` | `VIEW_CHANNEL` | `Message[]`: die nächsten `limit` neueren Nachrichten, neueste zuerst |
-| POST | `/channels/{id}/messages` | `SEND_MESSAGES` | `{ content, attachment_ids?, reply_to_id? }` → `Message` |
+| POST | `/channels/{id}/messages` | `SEND_MESSAGES` | `{ content, attachment_ids?, reply_to_id?, embeds? /* nur Bots */ }` → `Message` |
 | PATCH | `/messages/{id}` | Autor mit `SEND_MESSAGES` im Kanal (blockierte DM: nein) | `{ content }` → `Message` |
 | DELETE | `/messages/{id}` | Autor oder `MANAGE_MESSAGES` | 204 |
 
 Inhalt: 1–4000 Zeichen (nach Trim nicht leer). Mit mindestens einem Anhang darf `content` leer sein.
 `attachment_ids`: höchstens 10 (`too_many_attachments`), zusätzlich `ATTACH_FILES` nötig. Jede ID muss ein
 eigener, noch nicht verknüpfter Upload aus demselben Kanal sein, sonst `invalid_attachments` (es entsteht keine
-Nachricht). Löschen einer Nachricht löscht auch ihre Anhänge samt Dateien.
+Nachricht). Löschen einer Nachricht löscht auch ihre Anhänge samt Dateien. Bots dürfen `embeds` (wie bei Webhooks,
+höchstens 10) mitschicken; dann darf `content` leer sein. Menschen bekommen dafür `invalid_request`.
+Webhook-Nachrichten kann nur der Webhook selbst bearbeiten; löschen können ihn Moderatoren (`MANAGE_MESSAGES`).
 
 **Antworten:** `reply_to_id` muss eine Nachricht im selben Kanal sein, sonst `invalid_reply`. `referenced_message` ist eine
 kompakte Vorschau des Originals (Inhalt auf 200 Zeichen gekürzt). Wird das Original gelöscht, bleibt die Antwort erhalten:
@@ -430,6 +533,126 @@ Erwähnungen in Code (`` `…` `` oder ```` ```…``` ````). `@everyone` setzt `
 `_kursiv_`, `~~durchgestrichen~~`, `` `Code` ``, Codeblöcke mit ```` ``` ````, `> Zitat`, `||Spoiler||`, automatische Links
 (nur `http`/`https`); `\` maskiert ein Steuerzeichen. Custom-Emotes (`<:name:id>`, siehe „Custom-Emotes“) erscheinen als
 Bild (22 px); besteht eine Nachricht nur aus höchstens 27 Emojis (Unicode oder Custom), werden sie groß (48 px) gezeigt.
+
+### AutoMod
+Regeln pro Community, die der Server beim **Erstellen und Bearbeiten** von Nachrichten in Community-Kanälen prüft
+(nicht in DMs). Je Art gibt es eine Regel; anfangs sind alle aus.
+
+| Methode | Pfad | Recht | Body / Antwort |
+|---|---|---|---|
+| GET | `/communities/{id}/automod` | `MANAGE_COMMUNITY` | `AutoModRule[]` (immer alle vier, feste Reihenfolge) |
+| PUT | `/communities/{id}/automod` | `MANAGE_COMMUNITY` | `{ rules: AutoModRule[] }` (nur die übergebenen Arten, jede höchstens einmal) → `AutoModRule[]` |
+
+```
+AutoModRule { kind: 'keyword' | 'links' | 'mentions' | 'spam', enabled: boolean,
+              actions: { block: boolean, alert: boolean, audit: boolean },
+              alert_channel_id: string | null, custom_message: string | null,
+              exempt_role_ids: string[], exempt_channel_ids: string[], config }
+config (keyword)  { terms: string[], allow: string[] }
+config (links)    { allowed_domains: string[], block_foreign_invites: boolean }
+config (mentions) { max_mentions: number }
+config (spam)     { max_messages: number, per_seconds: number, max_duplicates: number }
+```
+
+- **Wortfilter** (`keyword`): bis 1000 Begriffe à 60 Zeichen. Ohne Platzhalter zählen nur ganze Wörter bzw.
+  Wortfolgen; `foo*` = Wortanfang, `*foo` = Wortende, `*foo*` = irgendwo im Wort. Vergleich nach Unicode-NFKC,
+  ohne Groß/Klein-Unterschied, Leerraum vereinheitlicht. `allow`: ganze Wörter, die nie als Treffer zählen (ohne `*`).
+  Ungültig → `invalid_keyword`.
+- **Links** (`links`): blockiert `schema://…` und `www.…` außer zu Domains aus `allowed_domains` (bis 200, Subdomains
+  inklusive; Eingaben wie `https://www.x.de/pfad` werden zu `www.x.de`, sonst `invalid_domain`). Links zur eigenen
+  Instanz (`public_url`) sind immer erlaubt. `block_foreign_invites`: Einladungslinks fremder Instanzen
+  (`…/invite/…`) und Discord-Einladungen auch bei erlaubter Domain blockieren.
+- **Erwähnungen** (`mentions`): mehr als `max_mentions` (1–50) verschiedene erwähnte Mitglieder (`@everyone` zählt nicht).
+- **Spam** (`spam`): mehr als `max_messages` (2–50, 0 = aus) Nachrichten in `per_seconds` (1–60) Sekunden oder mehr als
+  `max_duplicates` (2–20, 0 = aus) identische Nachrichten hintereinander (normalisiert, Abstand < 10 min). Zähler
+  liegen im Speicher des Servers; Bearbeitungen zählen nicht. Alarm/Audit nur beim ersten Verstoß einer Serie.
+- **Aktionen:** `block` → die Nachricht wird nicht gespeichert, Antwort
+  `403 { error: "automod_blocked", rule, rule_name, message }` (`message` = `custom_message`, max. 150 Zeichen, sonst
+  ein Standardtext). `alert` → Systemnachricht `kind: 'automod_alert'` im Protokollkanal `alert_channel_id` (Textkanal
+  der Community, sonst `invalid_channel`; aktiv ohne Kanal → `alert_channel_required`), Autor = betroffenes Mitglied,
+  `content` = JSON `{ rule, rule_name, channel_id, blocked, edit, detail, excerpt }` (`excerpt` = Inhalt, auf 300
+  Zeichen gekürzt). `audit` → Audit-Log `automod.block` bzw. `automod.flag` (ohne Inhalt). Aktive Regel ohne Aktion →
+  `invalid_actions`. Alarme erscheinen nicht in der Suche und sind nicht bearbeitbar.
+- **Ausnahmen:** Besitzer und Mitglieder mit `ADMINISTRATOR`/`MANAGE_COMMUNITY` immer; pro Regel Rollen
+  (`exempt_role_ids`) und Kanäle (`exempt_channel_ids`), je bis 100 (IDs fremder Communities werden verworfen).
+- **Bots und Webhooks:** Bots werden wie Mitglieder geprüft (ihre Rollen zählen für Ausnahmen, mit
+  `ADMINISTRATOR`/`MANAGE_COMMUNITY` sind sie ausgenommen). Webhook-Nachrichten werden beim Senden und Bearbeiten
+  immer geprüft (keine Rollen, Flut-Zähler pro Webhook); blockiert → dieselbe `403 automod_blocked`-Antwort an den
+  Aufrufer. Im Alarm steht statt eines Autors der Webhook-Name (`webhook`), ein Audit-Eintrag entfällt (kein Akteur).
+- Änderungen landen als `automod.update` im Audit-Log. Gateway-Events gibt es für die Regeln keine.
+
+### Eingehende Webhooks
+
+Ein Webhook gehört zu einem Textkanal einer Community und schreibt dort ohne Anmeldung Nachrichten. Verwaltung mit
+`MANAGE_WEBHOOKS` im Kanal (unsichtbare Kanäle sind `404`), jede Änderung steht im Audit-Log.
+
+| Methode | Pfad | Recht | Body / Antwort |
+|---|---|---|---|
+| GET | `/channels/{id}/webhooks` | `MANAGE_WEBHOOKS` | `Webhook[]` |
+| POST | `/channels/{id}/webhooks` | `MANAGE_WEBHOOKS` | `{ name }` (1–80 Zeichen) → 201 `Webhook & { token, url }` – **nur hier im Klartext** |
+| GET | `/communities/{id}/webhooks` | Mitglied | `Webhook[]` aller Kanäle, in denen man `MANAGE_WEBHOOKS` hat |
+| GET | `/webhooks/{id}` | `MANAGE_WEBHOOKS` | `Webhook` |
+| PATCH | `/webhooks/{id}` | `MANAGE_WEBHOOKS` (bei `channel_id` auch im Zielkanal) | `{ name?, channel_id? }` → `Webhook`; Zielkanal: Textkanal derselben Community, sonst `invalid_channel` |
+| POST | `/webhooks/{id}/token` | `MANAGE_WEBHOOKS` | → `Webhook & { token, url }`; das alte Token gilt sofort nicht mehr |
+| DELETE | `/webhooks/{id}` | `MANAGE_WEBHOOKS` | 204; bisherige Nachrichten bleiben mit Namen (`webhook_id` wird `null`) |
+| POST / DELETE | `/webhooks/{id}/avatar` | `MANAGE_WEBHOOKS` | multipart `file` (wie Profilbilder) → `Webhook` |
+| GET | `/webhooks/{id}/avatar/{avatar_id}` | Mitglied der Community | Bild |
+
+Höchstens 15 Webhooks je Kanal (`too_many_webhooks`). Tokens (`lykw_…`) werden nur als SHA-256-Hash gespeichert.
+Gateway: `WEBHOOKS_UPDATE` `{ community_id, channel_id }` an alle, die den Kanal sehen – Verwaltungsansichten laden neu.
+
+**Ausführen (ohne Anmeldung, Discord-kompatibel):**
+
+| Methode | Pfad | Body / Antwort |
+|---|---|---|
+| POST | `/webhooks/{id}/{token}[?wait=true]` | JSON `{ content?, username?, embeds?, allowed_mentions? }` oder `multipart/form-data` mit `payload_json` → 204, mit `wait=true` 200 `Message` |
+| GET | `/webhooks/{id}/{token}` | `Webhook` (ohne `created_by`) – zum Prüfen der URL |
+| PATCH | `/webhooks/{id}/{token}/messages/{message_id}` | `{ content?, embeds?, allowed_mentions? }` → `Message` (nur eigene Nachrichten, sonst `unknown_message`) |
+| DELETE | `/webhooks/{id}/{token}/messages/{message_id}` | 204 |
+
+- Unbekannte ID → `404 unknown_webhook`, falsches Token → `401 invalid_webhook_token`.
+- Rate-Limit: 30 Aufrufe pro Minute und Webhook (`429` mit `Retry-After`).
+- `content` höchstens 4000 Zeichen; ohne Text braucht es mindestens ein Embed (`empty_message`).
+- `username` ersetzt den Anzeigenamen für diese Nachricht (1–80 Zeichen), sonst gilt der Webhook-Name.
+- **`avatar_url` wird ignoriert** (Datenschutz: Clients würden das Bild sonst von fremden Servern laden und die
+  IP-Adressen der Lesenden preisgeben). Angezeigt wird nur der in Lykos hochgeladene Webhook-Avatar.
+- `embeds`: höchstens 10, zusammen höchstens 6000 Zeichen (`invalid_embeds`). Übernommen werden Titel, Beschreibung,
+  Link, Farbe, Zeitstempel, Felder (max. 25), Autor-Name/-Link und Fußzeilen-Text; zu lange Texte werden gekürzt.
+  **Bilder (`image`, `thumbnail`, `author.icon_url`, `footer.icon_url`, `video`) werden verworfen** – aus demselben Grund.
+- `allowed_mentions`: Ohne Angabe werden erwähnte Nutzer (`@name`) benachrichtigt, `@everyone` aber nie (sicherer als
+  Discords Standard). Mit Angabe wie bei Discord: `parse` mit `"users"`/`"everyone"` (`"roles"` wird ignoriert, Lykos
+  hat keine Rollen-Erwähnungen), `users` = erlaubte Nutzer-IDs. `@everyone` braucht also ausdrücklich
+  `{ "parse": ["everyone"] }`.
+- **Dateien werden nicht angenommen** (`attachments_not_supported`): Anhänge zählen gegen das Speicher-Kontingent eines
+  Nutzers, das es beim Webhook nicht gibt. `multipart/form-data` geht mit `payload_json` (bzw. einfachen Feldern
+  `content`/`username`) ohne Dateifelder.
+- Ignoriert werden außerdem `tts`, `flags`, `thread_id`, `components`. Der GitHub-Endpunkt (`…/github`) und
+  Slack-kompatible Payloads (`…/slack`) gibt es nicht.
+
+Funktioniert mit den „Discord“-Webhooks von Gitea/Forgejo, Grafana, Uptime Kuma und den meisten Skripten.
+
+### Bot-Konten
+
+Bots sind Nutzer mit `bot: true`, gehören einem Besitzer und haben kein Passwort, keine E-Mail und keine 2FA. Jeder
+Nutzer darf bis zu 10 Bots anlegen; Instanz-Admins können Bots mit `allow_bots` (siehe Instanz-Einstellungen) ganz
+abschalten – dann sind Anlegen und Hinzufügen gesperrt (`bots_disabled`) und alle Bot-Tokens ungültig.
+Anleitung mit Beispielen: `docs/bots.md`.
+
+| Methode | Pfad | Recht | Body / Antwort |
+|---|---|---|---|
+| GET | `/bots` | angemeldet (kein Bot) | eigene `Bot[]` |
+| POST | `/bots` | angemeldet (kein Bot) | `{ username, display_name?, description? /* max. 400 */, is_public? }` → 201 `Bot & { token }` – **Token nur hier im Klartext** |
+| GET | `/bots/{id}` | Besitzer oder öffentlicher Bot | `Bot` |
+| PATCH | `/bots/{id}` | Besitzer | `{ display_name?, description?, is_public? }` → `Bot` |
+| POST | `/bots/{id}/token` | Besitzer | → `Bot & { token }`; altes Token ungültig, Gateway-Verbindungen des Bots werden geschlossen (4001) |
+| DELETE | `/bots/{id}` | Besitzer | 204 – Bot verlässt alle Communities, Nachrichten bleiben ohne Autor |
+| POST / DELETE | `/bots/{id}/avatar` | Besitzer | multipart `file` → `Bot` |
+| POST | `/communities/{id}/bots` | `MANAGE_COMMUNITY` | `{ bot_id }` → 201 `Member`; eigener Bot oder öffentlicher Bot eines anderen (sonst `unknown_bot`), `already_member` |
+
+Bot-Benutzernamen teilen sich den Namensraum mit Menschen. Bots erscheinen in der Mitgliederliste mit `user.bot`,
+können gekickt werden und Rollen bekommen wie alle anderen; Besitz an einen Bot zu übertragen geht nicht. Bots nehmen
+keine Freundschaftsanfragen an. Löscht der Besitzer sein Konto, werden seine Bots mit gelöscht. Der Datenexport
+enthält die eigenen Bots (`bots`, ohne Token).
 
 ### Reaktionen
 | Methode | Pfad | Recht | Antwort |
@@ -564,7 +787,7 @@ unter jeder anderen Rolle). Kanal-Overrides sind nicht an die Hierarchie gebunde
 | DELETE | `/invites/{code}` | Ersteller oder `MANAGE_COMMUNITY` | 204 |
 | GET | `/invites/{code}` | – | `{ code, kind: 'community'\|'instance', instance_name, community: { id, name, icon_url, banner_url, description, accent_color } \| null, member_count }` – Bild-URLs über die Einladung (siehe „Gestaltung“) |
 | GET | `/invites/{code}/icon/{icon_id}`, `/invites/{code}/banner/{banner_id}` | – (gültige Einladung) | Bild – auch über eine Instanz-Einladung mit automatischem Beitritt zu dieser Community |
-| POST | `/invites/{code}/accept` | angemeldet | `CommunityDetail`; bei Instanz-Einladungen `409 instance_invite` (gelten nur für die Registrierung) |
+| POST | `/invites/{code}/accept` | angemeldet | `CommunityDetail`; bei Instanz-Einladungen `409 instance_invite` (gelten nur für die Registrierung), für Gebannte `403 banned` |
 
 Einladungslink im Client: `{public_url}/invite/{code}` – für Community- und Instanz-Einladungen. Bei
 `kind: 'instance'` ist `community` die Community, der neue Nutzer automatisch beitreten (sonst `null`).
@@ -579,9 +802,12 @@ Kanal-Endpunkte (`/channels/{id}/messages`, `/channels/{id}/attachments`, `/chan
 | Methode | Pfad | Recht | Body / Antwort |
 |---|---|---|---|
 | GET | `/dms` | angemeldet | `DmChannel[]`, neueste Aktivität zuerst |
-| POST | `/dms` | angemeldet | `{ recipient_ids: string[], name? }` → `DmChannel` (201 neu, 200 bestehende 1:1-DM) |
+| POST | `/dms` | angemeldet | `{ recipient_ids: string[], name?, group?: boolean }` → `DmChannel` (201 neu, 200 bestehende 1:1-DM) |
 | PATCH | `/dms/{id}` | Teilnehmer, nur `group_dm` | `{ name: string \| null }` → `DmChannel` |
 | DELETE | `/dms/{id}` | Teilnehmer, nur `group_dm` | 204 – Gruppe verlassen; der letzte Teilnehmer löscht sie samt Verlauf |
+| POST | `/dms/{id}/recipients` | Teilnehmer | `{ recipient_ids: string[] }` → `DmChannel` – Leute hinzufügen: Gruppe → 200 (erweiterte Gruppe), 1:1-DM → 201 (**neue** Gruppe) |
+| PUT | `/dms/{id}/pin` | Teilnehmer | → `DmChannel` (eigene Sicht) – Unterhaltung für sich anpinnen (höchstens 20, sonst `400 too_many_dm_pins`); schon angepinnte behalten ihren Zeitpunkt |
+| DELETE | `/dms/{id}/pin` | Teilnehmer | 204 – Pin lösen (auch wenn nicht angepinnt) |
 | GET | `/dms/contacts` | angemeldet | `UserPublic[]` – wem man eine neue DM schreiben kann (Freunde + Mitglieder gemeinsamer Communities mit `allow_dms`, ohne Blockaden) |
 | GET | `/dms/settings` | angemeldet | `{ allow_dms: boolean }` |
 | PATCH | `/dms/settings` | angemeldet | `{ allow_dms: boolean }` → `{ allow_dms }` |
@@ -592,6 +818,23 @@ Kanal-Endpunkte (`/channels/{id}/messages`, `/channels/{id}/attachments`, `/chan
   zu unterscheiden. Mit einem Empfänger wird eine
   bestehende 1:1-DM wiederverwendet (auch wenn die Bedingungen inzwischen nicht mehr gelten), `name` ist dann
   nicht erlaubt. Gruppen-DMs werden immer neu angelegt.
+- **Gruppe erstellen:** Mit `group: true` entsteht immer eine neue Gruppe (`group_dm`), auch mit nur einem
+  Empfänger oder ganz ohne (`recipient_ids: []` – man ist allein und fügt später Leute hinzu); `name` ist erlaubt.
+  Ohne das Flag bleibt alles wie oben (ein Empfänger → 1:1-DM, leere Liste → `400 invalid_request`).
+- **Leute hinzufügen** (`POST /dms/{id}/recipients`): Jeder Teilnehmer darf das. Die Neuen müssen für ihn erreichbar
+  sein wie beim Eröffnen (sonst `403 dm_not_allowed`); schon Enthaltene werden ignoriert – bleibt niemand übrig
+  (oder steht man selbst in der Liste), `400 invalid_request`; mehr als 10 Teilnehmer → `400 too_many_recipients`.
+  - In einer **Gruppe** kommen die Neuen dazu: Sie bekommen `DM_CREATE` (und abonnieren den Kanal), alle anderen
+    `DM_UPDATE`, im Verlauf erscheint die Systemnachricht `kind: 'recipient_add'` (Autor = wer hinzugefügt hat,
+    `mentions` = die Hinzugefügten, `content` leer; zählt für sie als Erwähnung). Die Neuen sehen den ganzen
+    Verlauf. Ein laufender Anruf geht weiter; die Neuen bekommen seinen Zustand als `VOICE_STATE_UPDATE` bzw.
+    `CALL_UPDATE` nachgereicht (es klingelt bei ihnen nicht).
+  - In einer **1:1-DM** entsteht eine **neue Gruppe** aus beiden und den Neuen (wie bei `POST /dms` mit
+    `group: true`, alle bekommen `DM_CREATE`); die 1:1-DM bleibt samt Verlauf bestehen. Hat einer das Gegenüber
+    blockiert (oder ist dessen Konto gesperrt), `403 dm_not_allowed`.
+- **Anpinnen** gilt nur für einen selbst (`pinned_at` in der eigenen Sicht von `GET /dms`, also auch nach
+  READY/RESYNC aktuell). Änderungen gehen als `DM_PIN_UPDATE` an alle eigenen Verbindungen. Wer eine Gruppe
+  verlässt, verliert den Pin. Clients zeigen angepinnte Unterhaltungen oben, nach Anpinn-Zeitpunkt.
 - **Einstellung `allow_dms`** gilt nur für neue DMs; bestehende Unterhaltungen bleiben nutzbar. Freunde dürfen
   trotzdem eine DM eröffnen.
 - **Blockiert:** In einer bestehenden 1:1-DM, in der einer den anderen blockiert hat, haben beide nur noch
@@ -671,7 +914,7 @@ LiveKit verlängert laufende Sitzungen selbst): `iss` = API-Key, `sub` = Nutzer-
 `name` = Anzeigename, `video = { room: <channel_id>, roomJoin, canSubscribe: true,
 canPublish, canPublishData: false, canPublishSources }`. Quellen: `microphone` mit `SPEAK`,
 `screen_share` + `screen_share_audio` mit `STREAM`, `camera` mit `VIEW_CHANNEL` + `CONNECT` + `VIDEO`;
-ohne jede Quelle `canPublish: false`. `audio` sind die Ton-Einstellungen des Kanals (`bitrate` in kbit/s); der Client
+ohne jede Quelle `canPublish: false` (im AFK-Kanal der Community immer). `audio` sind die Ton-Einstellungen des Kanals (`bitrate` in kbit/s); der Client
 setzt sie als `audioPreset.maxBitrate`, `forceStereo`, `dtx` und `red` der Mikrofonspur.
 
 **Nutzerlimit:** Hat der Kanal ein `user_limit` und sitzen (laut Voice-Status) schon so viele *andere* Nutzer darin,
@@ -918,6 +1161,9 @@ authentifiziert. Sonst muss der Client binnen 10 s senden:
 { "op": "identify", "token": "<token>" }
 ```
 
+Bots verbinden sich mit `Authorization: Bot <token>` oder senden `{ "op": "identify", "token": "Bot lykb_…" }`
+(ein Token mit Präfix `lykb_` gilt auch ohne „Bot “ als Bot-Token).
+
 Server → Client: `{ "t": "<TYP>", "d": { ... } }`
 
 | `t` | `d` |
@@ -929,6 +1175,8 @@ Server → Client: `{ "t": "<TYP>", "d": { ... } }`
 | `MESSAGE_DELETE` | `{ id, channel_id, community_id }` |
 | `CHANNEL_CREATE` / `CHANNEL_UPDATE` | `Channel` |
 | `CHANNEL_DELETE` | `{ id, community_id }` |
+| `CATEGORY_CREATE` / `CATEGORY_UPDATE` | `Category` – nur an Verbindungen, die die Kategorie sehen (sichtbarer Kanal darin oder `MANAGE_CHANNELS`); Umsortieren schickt je geänderter Kategorie ein `CATEGORY_UPDATE`. Kommt ein `Channel` mit unbekannter `category_id`, `CommunityDetail` neu laden |
+| `CATEGORY_DELETE` | `{ id, community_id }` – an die ganze Community; Kanäle mit dieser Kategorie stehen danach ohne |
 | `COMMUNITY_UPDATE` | `Community` – auch bei Icon/Banner/Beschreibung/Akzentfarbe/Systemkanal |
 | `COMMUNITY_DELETE` | `{ id }` |
 | `MEMBER_ADD` / `MEMBER_UPDATE` | `{ community_id, member: Member }` |
@@ -945,7 +1193,8 @@ Server → Client: `{ "t": "<TYP>", "d": { ... } }`
 | `PRESENCE_BULK` | `{ presences: { user_id, status: PresenceStatus }[] }` – nach dem eigenen Beitritt zu einer Community: Status ihrer nicht-offline Mitglieder, die der Client noch nicht kennt; in den bestehenden Stand **einmischen** (nicht ersetzen) |
 | `TYPING_START` | `{ channel_id, community_id, user_id }` – an alle, die den Kanal sehen (auch an den Tippenden selbst) |
 | `READ_STATE_UPDATE` | `{ channel_id, community_id, last_read_message_id }` – nur an die eigenen Verbindungen |
-| `DM_CREATE` / `DM_UPDATE` | `DmChannel` (`last_read_message_id` immer `null`, `mention_count` immer `0` – Clients behalten ihren Stand) – an alle Teilnehmer |
+| `DM_CREATE` / `DM_UPDATE` | `DmChannel` (`last_read_message_id` und `pinned_at` immer `null`, `mention_count` immer `0` – Clients behalten ihren Stand) – an alle Teilnehmer; beim Hinzufügen zu einer Gruppe `DM_CREATE` nur an die Neuen, `DM_UPDATE` an die übrigen |
+| `DM_PIN_UPDATE` | `{ channel_id, pinned_at: string \| null }` – eigene Unterhaltung angepinnt bzw. gelöst; nur an die eigenen Verbindungen |
 | `DM_DELETE` | `{ id }` – nur an den Nutzer, der die Gruppe verlassen hat |
 | `RELATIONSHIP_ADD` | `Relationship` – Beziehung neu oder geändert (Anfrage gesendet/erhalten, angenommen, blockiert); jede Seite bekommt ihre eigene Sicht |
 | `RELATIONSHIP_REMOVE` | `{ id }` – Beziehung zu Nutzer `id` besteht nicht mehr (entfernt, abgelehnt, zurückgezogen, Blockade aufgehoben, vom anderen blockiert, Konto gelöscht) |
@@ -953,6 +1202,7 @@ Server → Client: `{ "t": "<TYP>", "d": { ... } }`
 | `INSTANCE_ADMIN_UPDATE` | `{ is_instance_admin }` – eigenes Instanz-Admin-Recht vergeben/entzogen; nur an die eigenen Verbindungen |
 | `FEEDBACK_UPDATE` | `Feedback` (Melder-Ansicht) – Status geändert oder neue Antwort; nur an den Melder |
 | `FEEDBACK_DELETE` | `{ id }` – Meldung gelöscht (Admin oder selbst zurückgezogen); nur an den Melder |
+| `WEBHOOKS_UPDATE` | `{ community_id, channel_id }` – Webhooks des Kanals geändert (angelegt, umbenannt, verschoben, Avatar, gelöscht) |
 
 Kanalgebundene Events (Nachrichten, Kanäle, Voice-Status) gehen nur an Verbindungen, die den Kanal sehen dürfen.
 In DM-Kanälen gehen `MESSAGE_*`, `TYPING_START` usw. an alle Teilnehmer; `community_id` ist dort `null`.

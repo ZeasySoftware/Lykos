@@ -1,0 +1,273 @@
+/* AutoMod: Einstellungsseite (Community-Einstellungen → AutoMod) und Alarm-Systemnachricht im Protokollkanal. */
+
+/* ---------- Einstellungen ---------- */
+
+.automod-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.automod-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--ok);
+}
+
+.automod-card {
+  margin-bottom: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  transition: border-color var(--dur) var(--ease);
+}
+.automod-card.enabled {
+  border-color: var(--border-strong);
+}
+.automod-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+.automod-card-icon {
+  display: grid;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--bg-content);
+  color: var(--text-muted);
+}
+.automod-card.enabled .automod-card-icon {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.automod-card-heading {
+  flex: 1;
+  min-width: 0;
+}
+.automod-card-heading h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+.automod-card-heading .settings-description {
+  margin: 2px 0 0;
+}
+.automod-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.automod-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.automod-inline {
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+.automod-list textarea {
+  min-height: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  resize: vertical;
+}
+.automod-list-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.automod-count {
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.automod-count.over {
+  color: var(--danger);
+}
+.automod-hint,
+.field > .automod-hint {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: var(--lh);
+}
+.automod-hint code {
+  padding: 0 3px;
+  border-radius: var(--r-xs);
+  background: var(--bg-content);
+  font-family: var(--font-mono);
+}
+.automod-warning,
+.field > .automod-warning {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+
+.automod-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.automod-subtitle {
+  margin-bottom: var(--sp-1);
+  padding: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.automod-actions .checkbox {
+  align-items: flex-start;
+}
+.automod-actions .checkbox input {
+  margin-top: 2px;
+}
+.automod-indent {
+  max-width: 420px;
+  margin-left: calc(16px + var(--sp-2));
+}
+
+.automod-exemptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+.automod-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.automod-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-content);
+  font-size: var(--fs-xs);
+}
+.automod-chip .role-dot {
+  width: 8px;
+  height: 8px;
+}
+.automod-chip-remove {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.automod-chip-remove:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+.automod-chip-remove:focus-visible {
+  outline: 2px solid var(--focus);
+}
+
+/* ---------- Alarm im Protokollkanal ---------- */
+
+.message.system-message.automod-alert {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.automod-alert .system-message-icon {
+  top: 14px;
+  color: var(--warn);
+  transform: none;
+}
+.automod-alert.blocked .system-message-icon {
+  color: var(--danger);
+}
+.automod-alert-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+.automod-alert-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--sp-2);
+}
+.automod-alert-title {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.automod-alert-meta .message-author {
+  display: inline;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.automod-alert-channel {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+button.automod-alert-channel {
+  cursor: pointer;
+}
+button.automod-alert-channel:hover {
+  color: var(--text-strong);
+  text-decoration: underline;
+}
+.automod-alert-excerpt {
+  margin: 0;
+  padding: var(--sp-1) var(--sp-3);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.automod-alert.blocked .automod-alert-excerpt {
+  border-left-color: var(--danger-border);
+}
+
+@media (max-width: 768px) {
+  .automod-exemptions {
+    grid-template-columns: 1fr;
+  }
+  .automod-indent {
+    margin-left: 0;
+  }
+}

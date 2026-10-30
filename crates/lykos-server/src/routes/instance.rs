@@ -20,6 +20,8 @@ pub struct InstanceInfo {
     allow_community_creation: bool,
     /// Ankündigung der Admins, die allen angezeigt wird; `null` = keine.
     announcement: Option<String>,
+    /// Bot-Konten erlaubt (Einstellungs-Tab „Entwickler“, Bots zu Communities hinzufügen).
+    allow_bots: bool,
     /// Mailversand eingerichtet: E-Mail-Adresse, „Passwort vergessen“ und 2FA per E-Mail verfügbar.
     email: bool,
     /// Konfigurierte Anmeldeanbieter („Mit … anmelden“).
@@ -57,6 +59,7 @@ pub async fn info(state: &AppState) -> ApiResult<InstanceInfo> {
         voice: state.config.livekit.is_some(),
         allow_community_creation: settings.allow_community_creation,
         announcement: settings.announcement,
+        allow_bots: settings.allow_bots,
         email: state.mailer.enabled(),
         oidc_providers: state
             .config

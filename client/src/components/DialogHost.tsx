@@ -6,9 +6,10 @@ import { errorText } from '../lib/errors'
 import { useToasts } from '../lib/toast'
 import { displayName, memberName, useMember, useStore } from '../store'
 import { lazyComponent } from '../lib/lazy'
+import { BanDialog } from './Bans'
 import { ConfirmDialog } from './ConfirmDialog'
-import { CreateChannelDialog, InviteDialog } from './Dialogs'
-import { GroupDmDialog, NewDmDialog } from './DirectMessages'
+import { CategoryDialog, CreateChannelDialog, InviteDialog } from './Dialogs'
+import { AddToDmDialog, CreateGroupDialog, GroupDmDialog, NewDmDialog } from './DirectMessages'
 import { EmojiInput } from './EmojiButton'
 import { LazyLayerFallback } from './LazyFallback'
 import { Modal } from './Modal'
@@ -32,12 +33,24 @@ export function DialogHost() {
             return <ConfirmDialog key={d.id} spec={d} onClose={onClose} />
           case 'nickname':
             return <NicknameDialog key={d.id} communityId={d.communityId} userId={d.userId} onClose={onClose} />
+          case 'ban':
+            return (
+              <BanDialog key={d.id} communityId={d.communityId} userId={d.userId} name={d.name} onClose={onClose} />
+            )
           case 'invite':
             return <InviteDialog key={d.id} communityId={d.communityId} onClose={onClose} />
           case 'createChannel':
             return (
-              <CreateChannelDialog key={d.id} communityId={d.communityId} initialKind={d.channelKind} onClose={onClose} />
+              <CreateChannelDialog
+                key={d.id}
+                communityId={d.communityId}
+                initialKind={d.channelKind}
+                initialCategory={d.categoryId}
+                onClose={onClose}
+              />
             )
+          case 'category':
+            return <CategoryDialog key={d.id} communityId={d.communityId} categoryId={d.categoryId} onClose={onClose} />
           case 'communitySettings':
             return (
               <Suspense key={d.id} fallback={<LazyLayerFallback />}>
@@ -67,6 +80,10 @@ export function DialogHost() {
             return <StatusTextDialog key={d.id} onClose={onClose} />
           case 'newDm':
             return <NewDmDialog key={d.id} onClose={onClose} />
+          case 'createGroupDm':
+            return <CreateGroupDialog key={d.id} onClose={onClose} />
+          case 'addToDm':
+            return <AddToDmHost key={d.id} dmId={d.dmId} onClose={onClose} />
         }
       })}
     </>
@@ -77,6 +94,12 @@ function GroupDmHost({ dmId, onClose }: { dmId: string; onClose: () => void }) {
   const dm = useStore((s) => s.dms[dmId])
   if (!dm) return null
   return <GroupDmDialog dm={dm} onClose={onClose} />
+}
+
+function AddToDmHost({ dmId, onClose }: { dmId: string; onClose: () => void }) {
+  const dm = useStore((s) => s.dms[dmId])
+  if (!dm) return null
+  return <AddToDmDialog dm={dm} onClose={onClose} />
 }
 
 /** Nickname in einer Community setzen (eigener oder – mit Recht – fremder). */

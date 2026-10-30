@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { endpoints } from '../lib/api'
 import type { Message } from '../lib/api'
 import { errorText } from '../lib/errors'
-import { displayName, dmTitle, useStore } from '../store'
+import { dmTitle, senderName, useStore } from '../store'
 import { isMobileLayout } from '../lib/mobile'
 import { Search, X } from 'lucide-react'
 
@@ -143,7 +143,7 @@ function SearchResult({ message, onClick }: { message: Message; onClick: () => v
   return (
     <button type="button" className="search-result" onClick={onClick}>
       <span className="search-result-meta">
-        <strong className="truncate">{displayName(message.author)}</strong>
+        <strong className="truncate">{senderName(message)}</strong>
         <span className="muted small truncate">{where}</span>
         <time className="muted small" dateTime={message.created_at}>
           {dateTimeFmt.format(new Date(message.created_at))}

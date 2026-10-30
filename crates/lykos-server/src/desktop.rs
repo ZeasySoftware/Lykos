@@ -188,7 +188,7 @@ fn same_origin(base: &reqwest::Url, url: &str) -> Option<reqwest::Url> {
 
 /// Antwort stückweise lesen und abbrechen, sobald sie `max` Bytes überschreitet – ein großer oder
 /// endloser Body landet so nie komplett im Speicher (`Content-Length` allein ist nicht verlässlich).
-async fn read_limited(mut res: reqwest::Response, max: usize) -> Result<Vec<u8>> {
+pub(crate) async fn read_limited(mut res: reqwest::Response, max: usize) -> Result<Vec<u8>> {
     if res.content_length().is_some_and(|len| len > max as u64) {
         bail!("{}: Antwort zu groß", res.url());
     }

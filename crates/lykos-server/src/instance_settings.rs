@@ -24,14 +24,18 @@ pub mod keys {
     pub const USER_QUOTA_MB: &str = "user_quota_mb";
     pub const ALLOW_COMMUNITY_CREATION: &str = "allow_community_creation";
     pub const ANNOUNCEMENT: &str = "announcement";
+    /// Bot-Konten erlaubt (Standard `true`). `false` sperrt Anlegen, Hinzufügen und alle Bot-Tokens
+    /// (`auth::resolve_bot_token` liest den Schlüssel direkt).
+    pub const ALLOW_BOTS: &str = "allow_bots";
 
-    pub const ALL: [&str; 6] = [
+    pub const ALL: [&str; 7] = [
         INSTANCE_NAME,
         REGISTRATION_MODE,
         MAX_UPLOAD_MB,
         USER_QUOTA_MB,
         ALLOW_COMMUNITY_CREATION,
         ANNOUNCEMENT,
+        ALLOW_BOTS,
     ];
 }
 
@@ -50,6 +54,8 @@ pub struct Effective {
     pub allow_community_creation: bool,
     /// Ankündigung, die allen angezeigt wird; `None` = keine.
     pub announcement: Option<String>,
+    /// Bot-Konten erlaubt.
+    pub allow_bots: bool,
 }
 
 /// Alle gespeicherten Einträge (Schlüssel → JSON-Wert).
@@ -92,6 +98,7 @@ pub fn resolve(config: &Config, stored: &HashMap<String, Value>) -> Effective {
             .map(str::trim)
             .filter(|a| !a.is_empty())
             .map(str::to_owned),
+        allow_bots: stored.get(keys::ALLOW_BOTS).and_then(Value::as_bool).unwrap_or(true),
     }
 }
 
@@ -116,6 +123,9 @@ mod tests {
         assert_eq!(defaults.user_quota_bytes, config.user_quota_bytes);
         assert!(defaults.allow_community_creation);
         assert_eq!(defaults.announcement, None);
+        assert!(defaults.allow_bots);
+        let no_bots: HashMap<String, Value> = [(keys::ALLOW_BOTS.to_owned(), json!(false))].into();
+        assert!(!resolve(&config, &no_bots).allow_bots);
 
         let stored: HashMap<String, Value> = [
             (keys::INSTANCE_NAME, json!("Rudel")),

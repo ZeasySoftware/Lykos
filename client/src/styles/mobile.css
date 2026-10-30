@@ -142,6 +142,13 @@
   .channel-group > header {
     min-height: var(--touch);
   }
+  /* Kein Hover auf Touch-Geräten: Kategorie-Aktionen immer zeigen. */
+  .category-actions {
+    opacity: 1;
+  }
+  .category-toggle {
+    min-height: var(--touch);
+  }
   .status-picker-button {
     min-height: var(--touch);
   }

@@ -593,3 +593,46 @@ async fn account_deletion_mid_call(db: PgPool) {
     let (_, ready) = connect(&app, &p.alex).await;
     assert!(ready["dm_calls"].as_array().unwrap().is_empty());
 }
+
+#[sqlx::test(migrator = "lykos_server::MIGRATOR")]
+async fn adding_people_keeps_the_running_call(db: PgPool) {
+    let app = call_app(db, 30);
+    let p = people(&app).await;
+    let group = open_dm(&app, &p.alex, &[&p.bob_id, &p.carol_id]).await;
+    // Dave kommt erst später dazu.
+    let dave = app.invited_user(&p.alex, &p.community, "dave").await;
+    let dave_id = app.user_id(&dave).await;
+    let (mut dave_ws, _) = connect(&app, &dave).await;
+    let (mut bob_ws, _) = connect(&app, &p.bob).await;
+
+    // Alex ruft an und ist im Raum; bei Bob und Carol klingelt es.
+    assert_eq!(join(&app, &p.alex, &group).await.0, StatusCode::OK);
+    webhook(&app, "participant_joined", &group, &p.alex_id, "PA_A").await;
+    next_of(&mut bob_ws, &["VOICE_STATE_UPDATE"]).await;
+
+    let (status, dm) = app
+        .call(
+            "POST",
+            &format!("/dms/{group}/recipients"),
+            Some(&p.bob),
+            Some(json!({ "recipient_ids": [dave_id] })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{dm}");
+    // Dave bekommt die Gruppe und den laufenden Anruf mit (Teilnehmer + Klingeln), ohne dass es bei ihm klingelt.
+    assert_eq!(next_of(&mut dave_ws, &["DM_CREATE"]).await["d"]["id"], group.as_str());
+    let vs = next_of(&mut dave_ws, &["VOICE_STATE_UPDATE"]).await;
+    assert_eq!(vs["d"]["user_id"], p.alex_id.as_str());
+    let call = next_of(&mut dave_ws, &["CALL_UPDATE"]).await;
+    assert!(!ringing(&call).contains(&dave_id));
+    assert!(!ringing(&call).is_empty());
+    // Der Anruf läuft weiter, Dave kann beitreten.
+    let in_call: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM voice_states WHERE channel_id = $1::uuid)")
+            .bind(&group)
+            .fetch_one(&app.db)
+            .await
+            .unwrap();
+    assert!(in_call);
+    assert_eq!(join(&app, &dave, &group).await.0, StatusCode::OK);
+}

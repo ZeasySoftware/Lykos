@@ -15,7 +15,16 @@ use crate::{
 /// Löscht das Konto endgültig: wirft es aus Voice, löscht Sessions (Gateway trennt), Mitgliedschaften,
 /// ungesendete Uploads, optional alle Nachrichten (`delete_messages`), und räumt leere DMs ab.
 /// Der Nutzer darf keine Communities mehr besitzen (sonst schlägt der Fremdschlüssel fehl).
+/// Eigene Bots werden vorher genauso gelöscht (Bots können keine Communities besitzen).
 pub async fn delete_account(state: &AppState, user_id: Uuid, delete_messages: bool) -> ApiResult<()> {
+    let bots: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE bot_owner_id = $1")
+        .bind(user_id)
+        .fetch_all(&state.db)
+        .await?;
+    for bot_id in bots {
+        Box::pin(delete_account(state, bot_id, delete_messages)).await?;
+    }
+
     let communities: Vec<Uuid> = sqlx::query_scalar("SELECT community_id FROM members WHERE user_id = $1")
         .bind(user_id)
         .fetch_all(&state.db)
@@ -29,10 +38,13 @@ pub async fn delete_account(state: &AppState, user_id: Uuid, delete_messages: bo
     calls::user_removed(state, user_id).await?;
 
     let mut tx = state.db.begin().await?;
-    let sessions: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM sessions WHERE user_id = $1")
-        .bind(user_id)
-        .fetch_all(&mut *tx)
-        .await?;
+    // Sessions bzw. bei Bots die Token-ID (dient im Gateway als Session).
+    let sessions: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM sessions WHERE user_id = $1 UNION ALL SELECT token_id FROM bots WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(&mut *tx)
+    .await?;
     // Profilbilder (Avatar, Banner) werden mit dem Konto gelöscht.
     let (avatar, banner): (Option<Uuid>, Option<Uuid>) =
         sqlx::query_as("SELECT avatar_id, banner_id FROM users WHERE id = $1 FOR UPDATE")

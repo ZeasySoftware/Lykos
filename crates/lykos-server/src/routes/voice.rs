@@ -51,6 +51,7 @@ impl ChannelAudio {
 /// Token zum Betreten eines Voice-Kanals. Rechte: `VIEW_CHANNEL` + `CONNECT`;
 /// `SPEAK` erlaubt das Mikrofon, `STREAM` die Bildschirmübertragung, `VIDEO` die Kamera.
 /// Ist der Kanal voll (`user_limit`), dürfen nur noch Nutzer mit `MANAGE_CHANNELS` hinein.
+/// Im AFK-Kanal der Community hat niemand `SPEAK`, `STREAM` oder `VIDEO`.
 ///
 /// DM-Kanäle: Token für den Anruf der DM (alle Teilnehmer dürfen sprechen, streamen, Kamera; Standard-Ton,
 /// kein Nutzerlimit; bei Blockade in einer 1:1-DM `call_not_allowed`). Klingelt es bei einem, nimmt er damit
@@ -72,6 +73,8 @@ pub async fn join(
         return Err(ApiError::BadRequest("not_a_voice_channel"));
     }
     permissions::require(perms, Permissions::CONNECT)?;
+    // Im AFK-Kanal: nur zuhören (das Token erlaubt kein Mikrofon, keinen Stream, keine Kamera).
+    let perms = voice::afk_restricted(perms, voice::is_afk_channel(&state, channel_id).await?);
     if let Some(limit) = channel.user_limit
         && !perms.contains(Permissions::MANAGE_CHANNELS)
     {

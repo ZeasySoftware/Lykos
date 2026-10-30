@@ -152,6 +152,12 @@ function describeAudit(e: AuditEntry, n: Names): string {
       return 'hat die Community verlassen.'
     case 'member.kick':
       return `hat ${n.user(e.target_id)} aus der Community entfernt.`
+    case 'member.ban':
+      return typeof d.reason === 'string'
+        ? `hat ${n.user(e.target_id)} gebannt (Grund: ${quoted(d.reason)}).`
+        : `hat ${n.user(e.target_id)} gebannt.`
+    case 'member.unban':
+      return `hat den Bann von ${n.user(e.target_id)} aufgehoben.`
     case 'member.role_add':
       return `hat ${n.user(e.target_id)} die Rolle ${n.role(d.role_id)} gegeben.`
     case 'member.role_remove':
@@ -161,7 +167,21 @@ function describeAudit(e: AuditEntry, n: Names): string {
     case 'invite.delete':
       return `hat die Einladung ${String(d.code ?? '')} widerrufen.`
     case 'message.delete':
-      return `hat eine Nachricht von ${n.user(d.author_id)} in ${n.channel(d.channel_id)} gelöscht.`
+      return d.webhook_id
+        ?`hat eine Webhook-Nachricht in ${n.channel(d.channel_id)} gelöscht.`
+        : `hat eine Nachricht von ${n.user(d.author_id)} in ${n.channel(d.channel_id)} gelöscht.`
+    case 'webhook.create':
+      return `hat den Webhook ${quoted(d.name)} in ${n.channel(d.channel_id)} angelegt.`
+    case 'webhook.update':
+      if (typeof d.channel_id === 'string') return `hat einen Webhook nach ${n.channel(d.channel_id)} verschoben.`
+      if (typeof d.name === 'string') return `hat einen Webhook in ${quoted(d.name)} umbenannt.`
+      return d.avatar ? 'hat den Avatar eines Webhooks geändert.' : 'hat den Avatar eines Webhooks entfernt.'
+    case 'webhook.token_reset':
+      return 'hat die URL eines Webhooks neu erzeugt.'
+    case 'webhook.delete':
+      return `hat den Webhook ${quoted(d.name)} aus ${n.channel(d.channel_id)} gelöscht.`
+    case 'bot.add':
+      return `hat den Bot ${quoted(d.username)} hinzugefügt.`
     case 'message.pin':
       return `hat eine Nachricht von ${n.user(d.author_id)} in ${n.channel(d.channel_id)} angepinnt.`
     case 'message.unpin':
@@ -170,6 +190,12 @@ function describeAudit(e: AuditEntry, n: Names): string {
       return typeof d.nickname === 'string'
         ? `hat den Nickname von ${n.user(e.target_id)} auf ${quoted(d.nickname)} gesetzt.`
         : `hat den Nickname von ${n.user(e.target_id)} entfernt.`
+    case 'automod.update':
+      return 'hat die AutoMod-Regeln geändert.'
+    case 'automod.block':
+      return `wurde vom AutoMod in ${n.channel(d.channel_id)} blockiert${d.detail ? ` (${String(d.detail)})` : ''}.`
+    case 'automod.flag':
+      return `wurde vom AutoMod in ${n.channel(d.channel_id)} gemeldet${d.detail ? ` (${String(d.detail)})` : ''}.`
     case 'community.transfer':
       return `hat den Besitz der Community an ${n.user(e.target_id)} übertragen.`
     default:

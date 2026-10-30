@@ -1,7 +1,8 @@
 use axum::{
     Router,
     extract::DefaultBodyLimit,
-    routing::{delete, get, post, put},
+    middleware,
+    routing::{delete, get, patch, post, put},
 };
 
 use crate::{gateway, state::AppState};
@@ -9,7 +10,11 @@ use crate::{gateway, state::AppState};
 mod admin;
 mod attachments;
 pub mod auth;
+mod automod;
+pub mod bans;
+pub mod bots;
 pub mod calls;
+pub mod categories;
 pub mod channels;
 pub mod communities;
 pub mod customization;
@@ -21,7 +26,7 @@ mod health;
 mod instance;
 pub mod invites;
 mod legal;
-mod messages;
+pub(crate) mod messages;
 mod oidc;
 mod password_reset;
 mod pins;
@@ -34,6 +39,7 @@ pub mod security;
 mod usage;
 pub mod users;
 mod voice;
+pub mod webhooks;
 
 /// Alle API-Routen, gemountet unter `/api`.
 pub fn api() -> Router<AppState> {
@@ -98,6 +104,7 @@ pub fn api() -> Router<AppState> {
         .route("/users/{id}/banner/{banner_id}", get(customization::user_banner))
         // Communities
         .route("/communities", get(communities::list).post(communities::create))
+        .route("/communities/templates/discord/{code}", get(communities::discord_template_preview))
         .route(
             "/communities/{id}",
             get(communities::get).patch(communities::update).delete(communities::delete),
@@ -123,13 +130,21 @@ pub fn api() -> Router<AppState> {
             delete(communities::remove_member).patch(communities::update_member),
         )
         .route("/communities/{id}/transfer", post(communities::transfer))
+        // Banns
+        .route("/communities/{id}/bans", get(bans::list))
+        .route("/communities/{id}/bans/{user_id}", put(bans::ban).delete(bans::unban))
         .route(
             "/communities/{id}/members/{user_id}/roles/{role_id}",
             put(communities::add_member_role).delete(communities::remove_member_role),
         )
         .route("/communities/{id}/audit-log", get(communities::audit_log))
+        .route("/communities/{id}/automod", get(automod::get).put(automod::update))
         .route("/communities/{id}/search", get(search::community))
         .route("/communities/{id}/channels", post(channels::create))
+        // Kanal-Kategorien
+        .route("/communities/{id}/categories", post(categories::create))
+        .route("/communities/{id}/categories/order", axum::routing::patch(categories::reorder))
+        .route("/categories/{id}", axum::routing::patch(categories::update).delete(categories::delete))
         .route("/communities/{id}/roles", post(roles::create))
         .route("/communities/{id}/roles/order", axum::routing::patch(roles::reorder))
         .route("/communities/{id}/invites", get(invites::list).post(invites::create))
@@ -171,6 +186,8 @@ pub fn api() -> Router<AppState> {
         .route("/dms/settings", get(dms::settings).patch(dms::update_settings))
         .route("/dms/search", get(search::dms))
         .route("/dms/{id}", axum::routing::patch(dms::update).delete(dms::leave))
+        .route("/dms/{id}/pin", put(dms::pin).delete(dms::unpin))
+        .route("/dms/{id}/recipients", post(dms::add))
         // Freundesystem
         .route("/relationships", get(relationships::list).post(relationships::create))
         .route("/relationships/settings", get(relationships::settings).patch(relationships::update_settings))
@@ -212,4 +229,36 @@ pub fn api() -> Router<AppState> {
         .route("/admin/feedback/{id}/issue", post(feedback::admin_create_issue))
         // Instanz-Verwaltung (Paket H)
         .merge(admin::routes())
+        // Eingehende Webhooks: Verwaltung (angemeldet, MANAGE_WEBHOOKS) …
+        .route("/channels/{id}/webhooks", get(webhooks::list_channel).post(webhooks::create))
+        .route("/communities/{id}/webhooks", get(webhooks::list_community))
+        .route("/webhooks/{id}", get(webhooks::get).patch(webhooks::update).delete(webhooks::delete))
+        .route("/webhooks/{id}/token", post(webhooks::regenerate_token))
+        .route(
+            "/webhooks/{id}/avatar",
+            post(webhooks::upload_avatar)
+                .delete(webhooks::delete_avatar)
+                .layer(DefaultBodyLimit::max(users::AVATAR_MAX_BYTES + 64 * 1024)),
+        )
+        .route("/webhooks/{id}/avatar/{avatar_id}", get(webhooks::avatar))
+        // … und Ausführen ohne Anmeldung (Token in der URL, Discord-kompatibel)
+        .route("/webhooks/{id}/{token}", get(webhooks::info).post(webhooks::execute))
+        .route(
+            "/webhooks/{id}/{token}/messages/{message_id}",
+            patch(webhooks::edit_message).delete(webhooks::delete_message),
+        )
+        // Bot-Konten
+        .route("/bots", get(bots::list).post(bots::create))
+        .route("/bots/{id}", get(bots::get).patch(bots::update).delete(bots::delete))
+        .route("/bots/{id}/token", post(bots::regenerate_token))
+        .route(
+            "/bots/{id}/avatar",
+            post(bots::upload_avatar)
+                .delete(bots::delete_avatar)
+                .layer(DefaultBodyLimit::max(users::AVATAR_MAX_BYTES + 64 * 1024)),
+        )
+        .route("/communities/{id}/bots", post(bots::add_to_community))
+        // Zentrale Sperre: Bots dürfen Konto-, Sicherheits-, Freundes-, DM-Eröffnungs- und
+        // Verwaltungs-Endpunkte nie nutzen (siehe `bots::bot_forbidden`).
+        .layer(middleware::from_fn(bots::reject_forbidden))
 }

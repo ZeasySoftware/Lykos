@@ -203,7 +203,8 @@ fn friendship_ended(state: &AppState, a: Uuid, b: Uuid) {
 /// gesperrte Konten. Blockaden prüft der Aufrufer.
 async fn accepts_requests(state: &AppState, from: Uuid, to: Uuid) -> ApiResult<bool> {
     let setting: Option<String> =
-        sqlx::query_scalar("SELECT friend_requests FROM users WHERE id = $1 AND disabled_at IS NULL")
+        // Bots nehmen keine Freundschaftsanfragen an.
+        sqlx::query_scalar("SELECT friend_requests FROM users WHERE id = $1 AND disabled_at IS NULL AND NOT is_bot")
             .bind(to)
             .fetch_optional(&state.db)
             .await?;

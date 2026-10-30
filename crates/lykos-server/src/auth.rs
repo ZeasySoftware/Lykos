@@ -20,6 +20,8 @@ use crate::{
 };
 
 pub const SESSION_COOKIE: &str = "lykos_session";
+/// Präfix von Bot-Tokens – macht sie für Secret-Scanner (z. B. gitleaks, GitHub) erkennbar.
+pub const BOT_TOKEN_PREFIX: &str = "lykb_";
 /// Sessions laufen so lange nach der letzten Nutzung ab.
 pub const SESSION_TTL: Duration = Duration::days(30);
 
@@ -73,16 +75,18 @@ pub fn token_hash(token: &str) -> Vec<u8> {
 /// `403 account_disabled`, wenn das Konto gesperrt ist (oder nicht existiert). Für Schritte vor der
 /// Session (2FA-Challenge, E-Mail-Code), damit gesperrte Konten gar nicht erst so weit kommen.
 pub async fn ensure_active(db: impl PgExecutor<'_>, user_id: Uuid) -> ApiResult<()> {
-    let active: bool =
-        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND disabled_at IS NULL)")
-            .bind(user_id)
-            .fetch_one(db)
-            .await?;
+    let active: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND disabled_at IS NULL AND NOT is_bot)",
+    )
+    .bind(user_id)
+    .fetch_one(db)
+    .await?;
     if active { Ok(()) } else { Err(ApiError::Forbidden("account_disabled")) }
 }
 
 /// Gesperrte Konten (`users.disabled_at`) bekommen keine Session: `403 account_disabled`.
-/// Jeder Anmeldeweg läuft hierüber – die Sperre gilt so automatisch für alle.
+/// Jeder Anmeldeweg läuft hierüber – die Sperre gilt so automatisch für alle. Bot-Konten melden sich nie an
+/// (sie nutzen nur ihr Token) und werden hier wie gesperrte behandelt.
 pub async fn create_session(
     db: impl PgExecutor<'_>,
     user_id: Uuid,
@@ -92,7 +96,7 @@ pub async fn create_session(
     let label = label.map(|l| l.trim().chars().take(64).collect::<String>()).filter(|l| !l.is_empty());
     let inserted = sqlx::query(
         "INSERT INTO sessions (id, user_id, token_hash, label, expires_at)
-         SELECT $1, $2, $3, $4, $5 FROM users WHERE id = $2 AND disabled_at IS NULL",
+         SELECT $1, $2, $3, $4, $5 FROM users WHERE id = $2 AND disabled_at IS NULL AND NOT is_bot",
     )
     .bind(Uuid::now_v7())
     .bind(user_id)
@@ -134,12 +138,61 @@ pub async fn resolve_token(state: &AppState, token: &str) -> ApiResult<Option<(U
     Ok(row)
 }
 
-/// Token aus `Authorization: Bearer` oder dem Session-Cookie.
-pub fn token_from_headers(headers: &HeaderMap) -> Option<String> {
-    if let Some(auth) = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok())
-        && let Some(token) = auth.strip_prefix("Bearer ")
-    {
-        return Some(token.trim().to_owned());
+/// Löst ein Bot-Token zu (user_id, token_id) auf. `token_id` wechselt mit jedem neuen Token und dient als
+/// Session-ID (Gateway-Widerruf). Gesperrte Bots und – per Instanz-Einstellung `allow_bots = false` –
+/// abgeschaltete Bots werden nicht angenommen.
+pub async fn resolve_bot_token(state: &AppState, token: &str) -> ApiResult<Option<(Uuid, Uuid)>> {
+    if !token.starts_with(BOT_TOKEN_PREFIX) {
+        return Ok(None);
+    }
+    Ok(sqlx::query_as(
+        "SELECT b.user_id, b.token_id FROM bots b JOIN users u ON u.id = b.user_id
+         WHERE b.token_hash = $1 AND u.is_bot AND u.disabled_at IS NULL
+           AND NOT EXISTS (SELECT 1 FROM instance_settings WHERE key = 'allow_bots' AND value = 'false'::jsonb)",
+    )
+    .bind(token_hash(token))
+    .fetch_optional(&state.db)
+    .await?)
+}
+
+/// Zugangsdaten einer Anfrage. `Debug` zeigt das Token nicht (Tokens landen nie im Log).
+pub enum Credential {
+    /// Session-Token (Bearer oder Cookie).
+    Session(String),
+    /// Bot-Token (`Authorization: Bot …`).
+    Bot(String),
+}
+
+impl std::fmt::Debug for Credential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Credential::Session(_) => "Credential::Session(…)",
+            Credential::Bot(_) => "Credential::Bot(…)",
+        })
+    }
+}
+
+impl Credential {
+    /// Token aus einem Gateway-`identify`: `Bot <token>` oder ein Token mit Bot-Präfix gilt als Bot-Token.
+    pub fn from_identify(token: &str) -> Self {
+        let token = token.trim();
+        match token.strip_prefix("Bot ") {
+            Some(bot) => Credential::Bot(bot.trim().to_owned()),
+            None if token.starts_with(BOT_TOKEN_PREFIX) => Credential::Bot(token.to_owned()),
+            None => Credential::Session(token.to_owned()),
+        }
+    }
+}
+
+/// Zugangsdaten aus `Authorization: Bot`, `Authorization: Bearer` oder dem Session-Cookie.
+pub fn credential_from_headers(headers: &HeaderMap) -> Option<Credential> {
+    if let Some(auth) = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+        if let Some(token) = auth.strip_prefix("Bot ") {
+            return Some(Credential::Bot(token.trim().to_owned()));
+        }
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            return Some(Credential::Session(token.trim().to_owned()));
+        }
     }
     headers
         .get_all(header::COOKIE)
@@ -148,7 +201,32 @@ pub fn token_from_headers(headers: &HeaderMap) -> Option<String> {
         .flat_map(|v| v.split(';'))
         .filter_map(|pair| pair.trim().split_once('='))
         .find(|(name, _)| *name == SESSION_COOKIE)
-        .map(|(_, value)| value.to_owned())
+        .map(|(_, value)| Credential::Session(value.to_owned()))
+}
+
+/// Kommt die Anfrage mit einem Bot-Token (`Authorization: Bot …`)?
+pub fn is_bot_request(headers: &HeaderMap) -> bool {
+    matches!(credential_from_headers(headers), Some(Credential::Bot(_)))
+}
+
+/// Löst Zugangsdaten zum angemeldeten Nutzer bzw. Bot auf.
+pub async fn resolve_credential(state: &AppState, credential: &Credential) -> ApiResult<Option<AuthUser>> {
+    Ok(match credential {
+        Credential::Session(token) => resolve_token(state, token)
+            .await?
+            .map(|(user_id, session_id)| AuthUser { user_id, session_id, is_bot: false }),
+        Credential::Bot(token) => resolve_bot_token(state, token)
+            .await?
+            .map(|(user_id, session_id)| AuthUser { user_id, session_id, is_bot: true }),
+    })
+}
+
+/// Token aus `Authorization: Bearer` oder dem Session-Cookie (keine Bot-Tokens).
+pub fn token_from_headers(headers: &HeaderMap) -> Option<String> {
+    match credential_from_headers(headers)? {
+        Credential::Session(token) => Some(token),
+        Credential::Bot(_) => None,
+    }
 }
 
 /// `Set-Cookie`-Wert für eine neue Session.
@@ -167,21 +245,24 @@ pub fn clear_cookie() -> String {
 
 // --- Extractor --------------------------------------------------------------
 
-/// Angemeldeter Nutzer. Als Handler-Argument erzwingt er eine gültige Session (sonst 401).
+/// Angemeldeter Nutzer oder Bot. Als Handler-Argument erzwingt er eine gültige Session bzw. ein gültiges
+/// Bot-Token (sonst 401). Bots laufen durch dieselben Rechteprüfungen wie Menschen; Konto-, Sicherheits-,
+/// Freundes- und ähnliche Endpunkte sperrt für sie zentral `routes::bots::reject_forbidden`.
 #[derive(Debug, Clone, Copy)]
 pub struct AuthUser {
     pub user_id: Uuid,
+    /// Session-ID; bei Bots die `token_id` des aktuellen Tokens.
     pub session_id: Uuid,
+    pub is_bot: bool,
 }
 
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = token_from_headers(&parts.headers).ok_or(ApiError::Unauthorized("unauthorized"))?;
-        let (user_id, session_id) =
-            resolve_token(state, &token).await?.ok_or(ApiError::Unauthorized("unauthorized"))?;
-        Ok(AuthUser { user_id, session_id })
+        let credential =
+            credential_from_headers(&parts.headers).ok_or(ApiError::Unauthorized("unauthorized"))?;
+        resolve_credential(state, &credential).await?.ok_or(ApiError::Unauthorized("unauthorized"))
     }
 }
 
@@ -279,6 +360,19 @@ mod tests {
         assert_eq!(token_from_headers(&h).as_deref(), Some("abc123"));
         h.insert(header::AUTHORIZATION, "Bearer xyz".parse().unwrap());
         assert_eq!(token_from_headers(&h).as_deref(), Some("xyz"));
+        assert!(!is_bot_request(&h));
+        h.insert(header::AUTHORIZATION, "Bot lykb_abc".parse().unwrap());
+        assert!(is_bot_request(&h));
+        assert_eq!(token_from_headers(&h), None);
+        assert!(matches!(credential_from_headers(&h), Some(Credential::Bot(t)) if t == "lykb_abc"));
+        assert_eq!(format!("{:?}", credential_from_headers(&h).unwrap()), "Credential::Bot(…)");
+    }
+
+    #[test]
+    fn identify_tokens() {
+        assert!(matches!(Credential::from_identify("Bot lykb_x"), Credential::Bot(t) if t == "lykb_x"));
+        assert!(matches!(Credential::from_identify("lykb_x"), Credential::Bot(t) if t == "lykb_x"));
+        assert!(matches!(Credential::from_identify("abc"), Credential::Session(t) if t == "abc"));
     }
 
     #[test]

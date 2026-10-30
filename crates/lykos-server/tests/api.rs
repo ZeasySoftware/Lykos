@@ -97,8 +97,10 @@ async fn bootstrap_invite_and_messaging(db: PgPool) {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
     let (_, list) = app.call("GET", &format!("/channels/{general_id}/messages"), Some(&alex), None).await;
-    assert_eq!(list.as_array().unwrap().len(), 1);
+    // Neben Bobs Nachricht steht seine Beitrittsmeldung (der erste Textkanal ist Systemkanal).
+    assert_eq!(list.as_array().unwrap().len(), 2);
     assert_eq!(list[0]["content"], "Hallo!");
+    assert_eq!(list[1]["kind"], "member_join");
 
     // Fremde Nachricht bearbeiten: nein. Als Besitzer löschen: ja (MANAGE_MESSAGES).
     let (status, _) =

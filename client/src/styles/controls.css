@@ -151,6 +151,11 @@ a.icon-button {
   font-size: var(--fs-sm);
   font-weight: 550;
 }
+/* Hinweise unter einem Feld (`muted`) sind keine Beschriftung – sonst überschreibt die Regel oben ihre Farbe. */
+.field > span.muted {
+  color: var(--text-muted);
+  font-weight: 400;
+}
 .field em {
   font-style: normal;
   font-weight: 400;

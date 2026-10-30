@@ -53,10 +53,22 @@ export const PERMISSIONS: PermissionInfo[] = [
   },
   { bit: Permission.KICK_MEMBERS, label: 'Mitglieder entfernen', description: 'Mitglieder aus der Community werfen; mit einer neuen Einladung können sie zurückkommen.', channels: null },
   {
+    bit: Permission.BAN_MEMBERS,
+    label: 'Mitglieder bannen',
+    description: 'Mitglieder dauerhaft ausschließen, Banns aufheben und die Bannliste sehen. Gebannte können über keine Einladung zurückkommen.',
+    channels: null,
+  },
+  {
     bit: Permission.MANAGE_EMOJIS,
     label: 'Emojis verwalten',
     description: 'Eigene Emojis der Community hochladen, umbenennen und löschen.',
     channels: null,
+  },
+  {
+    bit: Permission.MANAGE_WEBHOOKS,
+    label: 'Webhooks verwalten',
+    description: 'Webhooks für Integrationen anlegen, ändern, ihre URL neu erzeugen und löschen.',
+    channels: ['text'],
   },
   {
     bit: Permission.CHANGE_NICKNAME,
@@ -94,12 +106,13 @@ export const PERMISSION_GROUPS: { title: string; bits: number[] }[] = [
       Permission.MANAGE_CHANNELS,
       Permission.MANAGE_ROLES,
       Permission.MANAGE_COMMUNITY,
+      Permission.MANAGE_WEBHOOKS,
       Permission.VIEW_AUDIT_LOG,
     ],
   },
   {
     title: 'Mitgliedschaft',
-    bits: [Permission.CREATE_INVITES, Permission.CHANGE_NICKNAME, Permission.MANAGE_NICKNAMES, Permission.KICK_MEMBERS],
+    bits: [Permission.CREATE_INVITES, Permission.CHANGE_NICKNAME, Permission.MANAGE_NICKNAMES, Permission.KICK_MEMBERS, Permission.BAN_MEMBERS],
   },
   {
     title: 'Textkanäle',

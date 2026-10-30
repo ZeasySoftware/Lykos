@@ -5,7 +5,7 @@ import { errorText } from '../lib/errors'
 import { Markdown } from '../lib/markdown'
 import type { MarkdownOptions } from '../lib/markdown'
 import { useDismiss } from '../lib/useDismiss'
-import { displayName, useStore } from '../store'
+import { senderName, useStore } from '../store'
 import { Pin, PinOff, X } from 'lucide-react'
 
 const dateFmt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
@@ -99,7 +99,7 @@ export function PinnedMessages({
             {pins?.map((m) => (
               <li key={m.id} className="pin-item">
                 <div className="pin-meta">
-                  <strong>{displayName(m.author)}</strong>
+                  <strong>{senderName(m)}</strong>
                   <span className="muted small">{dateFmt.format(new Date(m.created_at))}</span>
                   <span className="pin-actions">
                     <button

@@ -13,12 +13,13 @@ use crate::{
     admin,
     audit::{self, AuditEntry},
     auth::AuthUser,
+    discord_template::{self, Template as DiscordTemplate},
     error::{ApiError, ApiResult},
     events::{self, Control, Scope},
     instance_settings,
-    models::{self, Channel, Community, CommunityRow, Member, Role, double_option},
+    models::{self, Category, Channel, Community, CommunityRow, Member, Role, double_option},
     permissions::{self, Permissions},
-    routes::{customization, read_states, roles},
+    routes::{categories, customization, read_states, roles},
     state::AppState,
     voice,
 };
@@ -27,6 +28,8 @@ use crate::{
 pub struct CommunityDetail {
     community: Community,
     channels: Vec<Channel>,
+    /// Kategorien mit mindestens einem sichtbaren Kanal (mit `MANAGE_CHANNELS`: alle), nach `position`.
+    categories: Vec<Category>,
     roles: Vec<Role>,
     permissions: Permissions,
     channel_permissions: HashMap<Uuid, Permissions>,
@@ -56,6 +59,12 @@ pub async fn detail(state: &AppState, user_id: Uuid, community_id: Uuid) -> ApiR
         })
         .collect::<Vec<_>>();
     channel_permissions.retain(|id, _| channels.iter().any(|c| c.id == *id));
+    let can_manage = ctx.base().contains(Permissions::MANAGE_CHANNELS);
+    let categories = models::categories_of(&state.db, community_id)
+        .await?
+        .into_iter()
+        .filter(|cat| categories::is_visible(cat.id, can_manage, channels.iter().map(|c| c.category_id)))
+        .collect();
 
     let (mut read_states, mut last_message_ids) =
         read_states::unread_info(state, user_id, community_id).await?;
@@ -67,6 +76,7 @@ pub async fn detail(state: &AppState, user_id: Uuid, community_id: Uuid) -> ApiR
     Ok(CommunityDetail {
         community,
         channels,
+        categories,
         roles: models::roles_of(&state.db, community_id).await?,
         permissions: ctx.base(),
         channel_permissions,
@@ -100,7 +110,37 @@ pub async fn list(State(state): State<AppState>, user: AuthUser) -> ApiResult<Js
 
 #[derive(Deserialize)]
 pub struct CreateBody {
-    name: String,
+    /// Pflicht, außer bei `discord_template` (dann Name der Vorlage als Vorgabe).
+    name: Option<String>,
+    /// Discord-Servervorlage (Link oder Code), deren Struktur übernommen wird.
+    discord_template: Option<String>,
+}
+
+/// Darf der Nutzer Communities anlegen? (Instanz-Einstellung: ggf. nur Instanz-Admins.)
+async fn require_creation_allowed(state: &AppState, user_id: Uuid) -> ApiResult<()> {
+    if !instance_settings::load(&state.db, &state.config).await?.allow_community_creation
+        && !admin::is_instance_admin(&state.db, user_id).await?
+    {
+        return Err(ApiError::Forbidden("community_creation_disabled"));
+    }
+    Ok(())
+}
+
+/// Code prüfen, Rate-Limit zählen und die Vorlage von Discord holen.
+async fn fetch_discord_template(state: &AppState, user_id: Uuid, source: &str) -> ApiResult<DiscordTemplate> {
+    let code = discord_template::extract_code(source).ok_or(ApiError::BadRequest("invalid_template_code"))?;
+    state.rate_limit.discord_template(user_id)?;
+    discord_template::fetch(&state.config.discord_api_url, &code).await
+}
+
+/// `GET /communities/templates/discord/{code}` – Vorschau einer Discord-Servervorlage vor dem Anlegen.
+pub async fn discord_template_preview(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(code): Path<String>,
+) -> ApiResult<Json<discord_template::Preview>> {
+    require_creation_allowed(&state, user.user_id).await?;
+    Ok(Json(fetch_discord_template(&state, user.user_id, &code).await?.preview()))
 }
 
 pub async fn create(
@@ -108,28 +148,34 @@ pub async fn create(
     user: AuthUser,
     Json(body): Json<CreateBody>,
 ) -> ApiResult<(StatusCode, Json<CommunityDetail>)> {
-    let name = validate_name(&body.name)?;
-    // Instanz-Einstellung: Communities anlegen ggf. nur für Instanz-Admins.
-    if !instance_settings::load(&state.db, &state.config).await?.allow_community_creation
-        && !admin::is_instance_admin(&state.db, user.user_id).await?
-    {
-        return Err(ApiError::Forbidden("community_creation_disabled"));
-    }
+    let name = body.name.as_deref().map(validate_name).transpose()?;
+    require_creation_allowed(&state, user.user_id).await?;
+    let template = match body.discord_template.as_deref() {
+        Some(source) => Some(fetch_discord_template(&state, user.user_id, source).await?),
+        None => None,
+    };
+    let name = match (name, &template) {
+        (Some(name), _) => name,
+        (None, Some(t)) => t.name.clone(),
+        (None, None) => return Err(ApiError::BadRequest("invalid_name")),
+    };
     let community_id = Uuid::now_v7();
+    let default_role_id = Uuid::now_v7();
 
     let mut tx = state.db.begin().await?;
-    sqlx::query("INSERT INTO communities (id, name, owner_id) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO communities (id, name, owner_id, description) VALUES ($1, $2, $3, $4)")
         .bind(community_id)
         .bind(&name)
         .bind(user.user_id)
+        .bind(template.as_ref().and_then(|t| t.description.as_deref()))
         .execute(&mut *tx)
         .await?;
     sqlx::query(
         "INSERT INTO roles (id, community_id, name, permissions, is_default) VALUES ($1, $2, '@alle', $3, true)",
     )
-    .bind(Uuid::now_v7())
+    .bind(default_role_id)
     .bind(community_id)
-    .bind(Permissions::DEFAULT_ROLE.0)
+    .bind(template.as_ref().map_or(Permissions::DEFAULT_ROLE, |t| t.default_permissions).0)
     .execute(&mut *tx)
     .await?;
     sqlx::query("INSERT INTO members (community_id, user_id) VALUES ($1, $2)")
@@ -137,17 +183,38 @@ pub async fn create(
         .bind(user.user_id)
         .execute(&mut *tx)
         .await?;
-    for (name, kind) in [("allgemein", "text"), ("Sprachkanal", "voice")] {
-        sqlx::query("INSERT INTO channels (id, community_id, name, kind) VALUES ($1, $2, $3, $4)")
-            .bind(Uuid::now_v7())
-            .bind(community_id)
-            .bind(name)
-            .bind(kind)
-            .execute(&mut *tx)
-            .await?;
+    match &template {
+        Some(template) => discord_template::apply(&mut tx, community_id, default_role_id, template).await?,
+        None => {
+            let text_channel_id = Uuid::now_v7();
+            for (id, name, kind) in
+                [(text_channel_id, "allgemein", "text"), (Uuid::now_v7(), "Sprachkanal", "voice")]
+            {
+                sqlx::query("INSERT INTO channels (id, community_id, name, kind) VALUES ($1, $2, $3, $4)")
+                    .bind(id)
+                    .bind(community_id)
+                    .bind(name)
+                    .bind(kind)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+            // Der erste Textkanal ist Systemkanal (Willkommensnachrichten), bis jemand etwas anderes einstellt.
+            sqlx::query("UPDATE communities SET system_channel_id = $2 WHERE id = $1")
+                .bind(community_id)
+                .bind(text_channel_id)
+                .execute(&mut *tx)
+                .await?;
+        }
     }
-    audit::record(&mut *tx, community_id, user.user_id, "community.create", None, json!({ "name": name }))
-        .await?;
+    audit::record(
+        &mut *tx,
+        community_id,
+        user.user_id,
+        "community.create",
+        None,
+        json!({ "name": name, "discord_template": template.as_ref().map(|t| &t.code) }),
+    )
+    .await?;
     tx.commit().await?;
 
     state.events.control(Scope::User(user.user_id), Control::Joined { user_id: user.user_id, community_id });
@@ -179,7 +246,20 @@ pub struct UpdateBody {
     /// Textkanal der Community für Beitritts-Meldungen (`null` = keine).
     #[serde(default, deserialize_with = "double_option")]
     system_channel_id: Option<Option<Uuid>>,
+    /// Beitrittsmeldungen im Systemkanal senden.
+    join_messages_enabled: Option<bool>,
+    /// Eigener Willkommenstext (max. 500 Zeichen, `null`/leer = zufällige Standardsätze).
+    #[serde(default, deserialize_with = "double_option")]
+    welcome_message: Option<Option<String>>,
+    /// Sprachkanal der Community für Inaktive (`null` = keiner).
+    #[serde(default, deserialize_with = "double_option")]
+    afk_channel_id: Option<Option<Uuid>>,
+    /// Zeit bis zum Wechsel in den AFK-Kanal: 60, 300, 900, 1800 oder 3600 Sekunden.
+    afk_timeout_seconds: Option<i32>,
 }
+
+/// Erlaubte AFK-Zeiten in Sekunden (wie bei Discord: 1, 5, 15, 30, 60 Minuten).
+pub const AFK_TIMEOUTS: [i32; 5] = [60, 300, 900, 1800, 3600];
 
 /// Obergrenze für das Community-Kontingent (≈ 10 TB) – schützt nur vor Unsinn.
 const MAX_UPLOAD_QUOTA_MB: i32 = 10_000_000;
@@ -219,14 +299,33 @@ pub async fn update(
             return Err(ApiError::BadRequest("invalid_channel"));
         }
     }
+    let welcome_message = body
+        .welcome_message
+        .map(|m| crate::auth::normalize_text(m, customization::WELCOME_MAX_CHARS, "invalid_welcome_message"))
+        .transpose()?;
+    if let Some(Some(channel_id)) = body.afk_channel_id {
+        let valid = models::channel_by_id(&state.db, channel_id)
+            .await?
+            .is_some_and(|c| c.community_id == Some(community_id) && c.kind == "voice");
+        if !valid {
+            return Err(ApiError::BadRequest("invalid_channel"));
+        }
+    }
+    if body.afk_timeout_seconds.is_some_and(|t| !AFK_TIMEOUTS.contains(&t)) {
+        return Err(ApiError::BadRequest("invalid_request"));
+    }
 
     let mut tx = state.db.begin().await?;
     // Darstellung: Feld nur setzen, wenn es im Body vorkam ($n = true).
     sqlx::query(
         "UPDATE communities SET
-            description       = CASE WHEN $2 THEN $3 ELSE description END,
-            accent_color      = CASE WHEN $4 THEN $5 ELSE accent_color END,
-            system_channel_id = CASE WHEN $6 THEN $7 ELSE system_channel_id END
+            description           = CASE WHEN $2 THEN $3 ELSE description END,
+            accent_color          = CASE WHEN $4 THEN $5 ELSE accent_color END,
+            system_channel_id     = CASE WHEN $6 THEN $7 ELSE system_channel_id END,
+            join_messages_enabled = COALESCE($8, join_messages_enabled),
+            welcome_message       = CASE WHEN $9 THEN $10 ELSE welcome_message END,
+            afk_channel_id        = CASE WHEN $11 THEN $12 ELSE afk_channel_id END,
+            afk_timeout_seconds   = COALESCE($13, afk_timeout_seconds)
          WHERE id = $1",
     )
     .bind(community_id)
@@ -236,6 +335,12 @@ pub async fn update(
     .bind(body.accent_color.flatten())
     .bind(body.system_channel_id.is_some())
     .bind(body.system_channel_id.flatten())
+    .bind(body.join_messages_enabled)
+    .bind(welcome_message.is_some())
+    .bind(welcome_message.clone().flatten())
+    .bind(body.afk_channel_id.is_some())
+    .bind(body.afk_channel_id.flatten())
+    .bind(body.afk_timeout_seconds)
     .execute(&mut *tx)
     .await?;
     if let Some(name) = &name {
@@ -272,6 +377,10 @@ pub async fn update(
             "description": description,
             "accent_color": body.accent_color,
             "system_channel_id": body.system_channel_id,
+            "join_messages_enabled": body.join_messages_enabled,
+            "welcome_message": welcome_message,
+            "afk_channel_id": body.afk_channel_id,
+            "afk_timeout_seconds": body.afk_timeout_seconds,
         }),
     )
     .await?;
@@ -280,6 +389,10 @@ pub async fn update(
     let community =
         models::community_by_id(&state.db, community_id).await?.ok_or_else(ApiError::not_found)?;
     state.events.publish(events::community(community_id), "COMMUNITY_UPDATE", &community);
+    if body.afk_channel_id.is_some() {
+        // Wer schon im (neuen) AFK-Kanal sitzt, verliert Mikrofon/Stream/Kamera – bzw. bekommt sie zurück.
+        voice::recheck_community(&state, community_id);
+    }
     Ok(Json(community))
 }
 
@@ -593,7 +706,8 @@ pub async fn transfer_ownership(
     let updated = sqlx::query(
         "UPDATE communities SET owner_id = $2
          WHERE id = $1 AND owner_id = $3
-           AND EXISTS (SELECT 1 FROM members WHERE community_id = $1 AND user_id = $2)",
+           AND EXISTS (SELECT 1 FROM members WHERE community_id = $1 AND user_id = $2)
+           AND NOT EXISTS (SELECT 1 FROM users WHERE id = $2 AND is_bot)",
     )
     .bind(community_id)
     .bind(to)
@@ -602,7 +716,7 @@ pub async fn transfer_ownership(
     .await?
     .rows_affected();
     if updated == 0 {
-        // Ziel ist kein Mitglied.
+        // Ziel ist kein Mitglied (oder ein Bot – Bots können keine Communities besitzen).
         return Err(ApiError::not_found());
     }
     audit::record(&mut *tx, community_id, actor, "community.transfer", Some(to), json!({ "from": from }))

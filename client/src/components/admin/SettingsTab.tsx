@@ -47,6 +47,8 @@ function SettingsForm({ settings, onSaved }: { settings: AdminSettings; onSaved:
   const [unlimited, setUnlimited] = useState(settings.user_quota_mb === null)
   const [quota, setQuota] = useState(String(settings.user_quota_mb ?? settings.defaults.user_quota_mb ?? 2048))
   const [allowCreate, setAllowCreate] = useState(settings.allow_community_creation)
+  // Ältere Server liefern das Feld nicht – dann gelten Bots als erlaubt (Standard).
+  const [allowBots, setAllowBots] = useState(settings.allow_bots ?? true)
   const [announcement, setAnnouncement] = useState(settings.announcement ?? '')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -78,6 +80,7 @@ function SettingsForm({ settings, onSaved }: { settings: AdminSettings; onSaved:
       max_upload_mb: upload,
       user_quota_mb: unlimited ? 0 : quotaMb,
       allow_community_creation: allowCreate,
+      allow_bots: allowBots,
       announcement: announcement.trim() || null,
     })
   }
@@ -151,6 +154,11 @@ function SettingsForm({ settings, onSaved }: { settings: AdminSettings; onSaved:
       <label className="checkbox">
         <input type="checkbox" checked={allowCreate} onChange={(e) => setAllowCreate(e.target.checked)} />
         Alle Nutzer dürfen Communities anlegen (sonst nur Instanz-Admins)
+      </label>
+
+      <label className="checkbox">
+        <input type="checkbox" checked={allowBots} onChange={(e) => setAllowBots(e.target.checked)} />
+        Bot-Konten erlauben (aus: niemand kann Bots anlegen oder hinzufügen, alle Bot-Tokens sind gesperrt)
       </label>
 
       <label className="field">

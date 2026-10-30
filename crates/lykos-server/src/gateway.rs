@@ -27,7 +27,7 @@ use crate::{
     models,
     permissions::{self, Permissions},
     presence::{ChosenStatus, Status},
-    routes::{calls, relationships},
+    routes::{calls, categories, relationships},
     state::AppState,
 };
 
@@ -78,13 +78,14 @@ pub async fn handler(
         tracing::debug!(origin = ?origin, "Gateway: fremder Origin abgelehnt");
         return ApiError::Forbidden("origin_not_allowed").into_response();
     }
-    let token = auth::token_from_headers(&headers);
+    // Session-Token (Cookie/Bearer) oder Bot-Token (`Authorization: Bot …`); sonst kommt es per `identify`.
+    let credential = auth::credential_from_headers(&headers);
     let initial = query
         .status
         .and_then(|s| serde_json::from_value(Value::String(s)).ok())
         .unwrap_or(ChosenStatus::Online);
     ws.max_message_size(64 * 1024).on_upgrade(move |socket| async move {
-        if let Err(e) = run(socket, state, token, initial).await {
+        if let Err(e) = run(socket, state, credential, initial).await {
             tracing::debug!(error = %e, "Gateway-Verbindung beendet");
         }
     })
@@ -93,6 +94,7 @@ pub async fn handler(
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 enum ClientOp {
+    /// Anmelden mit Session-Token oder Bot-Token (`Bot lykb_…` bzw. `lykb_…`).
     Identify {
         token: String,
     },
@@ -110,18 +112,18 @@ enum ClientOp {
 async fn run(
     mut socket: WebSocket,
     state: AppState,
-    token: Option<String>,
+    credential: Option<auth::Credential>,
     initial: ChosenStatus,
 ) -> anyhow::Result<()> {
-    let token = match token {
-        Some(t) => Some(t),
-        None => wait_for_identify(&mut socket).await,
+    let credential = match credential {
+        Some(c) => Some(c),
+        None => wait_for_identify(&mut socket).await.map(|t| auth::Credential::from_identify(&t)),
     };
-    let resolved = match token {
-        Some(t) => auth::resolve_token(&state, &t).await.map_err(api_err)?,
+    let resolved = match credential {
+        Some(c) => auth::resolve_credential(&state, &c).await.map_err(api_err)?,
         None => None,
     };
-    let Some((user_id, session_id)) = resolved else {
+    let Some(auth::AuthUser { user_id, session_id, .. }) = resolved else {
         close(&mut socket, CLOSE_UNAUTHORIZED, "unauthorized").await;
         return Ok(());
     };
@@ -529,17 +531,33 @@ impl Connection {
     ) -> Result<HashMap<Uuid, bool>, ApiError> {
         let ctx = permissions::member_context(&state.db, self.user_id, community_id).await?;
         let overrides = permissions::community_overrides(&state.db, community_id).await?;
-        let channels: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM channels WHERE community_id = $1")
-            .bind(community_id)
-            .fetch_all(&state.db)
-            .await?;
-        Ok(channels
-            .into_iter()
-            .map(|id| {
-                let perms = ctx.in_channel(overrides.get(&id).map_or(&[], Vec::as_slice));
-                (id, perms.contains(Permissions::VIEW_CHANNEL))
-            })
-            .collect())
+        let channels: Vec<(Uuid, Option<Uuid>)> =
+            sqlx::query_as("SELECT id, category_id FROM channels WHERE community_id = $1")
+                .bind(community_id)
+                .fetch_all(&state.db)
+                .await?;
+        let mut visible: HashMap<Uuid, bool> = HashMap::new();
+        let mut visible_categories = Vec::new();
+        for (id, category_id) in channels {
+            let perms = ctx.in_channel(overrides.get(&id).map_or(&[], Vec::as_slice));
+            let can_view = perms.contains(Permissions::VIEW_CHANNEL);
+            if can_view {
+                visible_categories.push(category_id);
+            }
+            visible.insert(id, can_view);
+        }
+        // Kategorien laufen unter ihrer ID durch dieselbe Prüfung (Events `CATEGORY_*`).
+        let categories: Vec<Uuid> =
+            sqlx::query_scalar("SELECT id FROM channel_categories WHERE community_id = $1")
+                .bind(community_id)
+                .fetch_all(&state.db)
+                .await?;
+        let can_manage = ctx.base().contains(Permissions::MANAGE_CHANNELS);
+        for id in categories {
+            let can_view = categories::is_visible(id, can_manage, visible_categories.iter().copied());
+            visible.insert(id, can_view);
+        }
+        Ok(visible)
     }
 }
 

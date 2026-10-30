@@ -923,12 +923,14 @@
 }
 .admin-row-main {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
+/* Viele Knöpfe (z. B. bei Bots) rutschen in eine eigene Zeile, statt den Namen abzuschneiden. */
 .admin-row-text {
   display: flex;
-  flex: 1;
+  flex: 1 1 160px;
   flex-direction: column;
   min-width: 0;
 }
@@ -939,6 +941,7 @@
   display: flex;
   flex-shrink: 0;
   gap: 6px;
+  margin-left: auto;
 }
 .admin-row-actions .button {
   min-height: 30px;
@@ -1037,6 +1040,12 @@
 }
 .dm-picker-item:hover {
   background: var(--bg-hover);
+}
+.dm-members-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
 }
 .dm-members {
   display: flex;
@@ -1227,4 +1236,63 @@
 .source-link:focus-visible {
   color: var(--text-strong);
   text-decoration: underline;
+}
+
+/* AFK-Kanal: Kanal und Zeit nebeneinander, schmal untereinander. */
+.afk-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-3);
+  max-width: 480px;
+}
+
+/* Bannliste: Grund kann mehrzeilig und lang sein. */
+.ban-reason {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* ---------- Webhooks & Bots ---------- */
+
+/* Einmalig angezeigtes Geheimnis (Webhook-URL, Bot-Token) mit Kopieren-Knopf. */
+.secret-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--warn-soft);
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+}
+.secret-box-value {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.secret-box code {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-2);
+  border-radius: var(--r-xs);
+  background: var(--bg-input);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.integration-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.integration-form .field {
+  flex: 1 1 220px;
+}
+.integration-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0 var(--sp-2) 44px;
 }

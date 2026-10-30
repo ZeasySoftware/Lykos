@@ -73,6 +73,29 @@ async fn announce(state: &AppState, channel_id: Uuid) -> ApiResult<()> {
     Ok(())
 }
 
+/// Neu hinzugefügte Teilnehmer einer Gruppen-DM bekommen einen laufenden Anruf mit: die Voice-States als
+/// `VOICE_STATE_UPDATE` und ggf. das Klingeln als `CALL_UPDATE` (READY/RESYNC kennen sie noch nicht). Der Anruf
+/// selbst bleibt unberührt; es klingelt bei den Neuen nicht.
+pub async fn sync_new_recipients(state: &AppState, channel_id: Uuid, users: &[Uuid]) -> ApiResult<()> {
+    let states: Vec<VoiceState> = sqlx::query_as(
+        "SELECT community_id, channel_id, user_id, self_mute, self_deaf, streaming, video, joined_at
+         FROM voice_states WHERE channel_id = $1 ORDER BY joined_at, user_id",
+    )
+    .bind(channel_id)
+    .fetch_all(&state.db)
+    .await?;
+    let call = load_state(&state.db, channel_id).await?;
+    for &uid in users {
+        for vs in &states {
+            state.events.publish(Scope::User(uid), "VOICE_STATE_UPDATE", vs);
+        }
+        if !call.ringing.is_empty() {
+            state.events.publish(Scope::User(uid), "CALL_UPDATE", &call);
+        }
+    }
+    Ok(())
+}
+
 /// Ist im Raum außer `user_id` niemand und klingelt es nirgends? Dann startet ein Beitritt einen Anruf.
 pub async fn is_idle(db: &sqlx::PgPool, channel_id: Uuid, user_id: Uuid) -> ApiResult<bool> {
     Ok(sqlx::query_scalar(

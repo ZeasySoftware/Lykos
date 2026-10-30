@@ -3,8 +3,8 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::{
-    config::Config, desktop::DesktopReleases, events::EventBus, mail::Mailer, oidc::Oidc, presence::Presence,
-    rate_limit::RateLimiter, storage::Storage,
+    automod::AutoMod, config::Config, desktop::DesktopReleases, events::EventBus, mail::Mailer, oidc::Oidc,
+    presence::Presence, rate_limit::RateLimiter, storage::Storage,
 };
 
 /// Geteilter Zustand aller Handler. Bewusst ohne eigenen fachlichen In-Memory-Zustand,
@@ -29,4 +29,6 @@ pub struct AppState {
     pub mailer: Arc<dyn Mailer>,
     /// OIDC-Client mit Cache für Discovery und Schlüssel der Anbieter.
     pub oidc: Arc<Oidc>,
+    /// AutoMod: Regel-Cache pro Community und Flut-Zähler (pro Prozess, siehe `automod.rs`).
+    pub automod: AutoMod,
 }

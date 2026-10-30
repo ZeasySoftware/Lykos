@@ -947,3 +947,94 @@ button.reply-preview:hover .reply-text {
     display: none;
   }
 }
+
+/* ---------- Bots & Webhooks ---------- */
+
+/* Kennzeichen „BOT“/„WEBHOOK“ neben Namen (Nachrichten, Mitgliederliste, Profilkarte). */
+.bot-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+  margin-left: var(--sp-1);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  line-height: var(--lh-tight);
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+.message-author.webhook {
+  cursor: default;
+}
+.message-author.webhook:hover {
+  text-decoration: none;
+}
+
+/* ---------- Embeds (Karten aus Webhook-/Bot-Nachrichten, ohne Bilder) ---------- */
+
+.embeds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+.embed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  max-width: 520px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-inline-start: 4px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  background: var(--bg-elevated);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.embed-author {
+  color: var(--text-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.embed-author a {
+  color: inherit;
+}
+.embed-title {
+  color: var(--text-strong);
+  font-weight: 650;
+}
+.embed-description {
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.embed-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin: var(--sp-1) 0 0;
+}
+.embed-field {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.embed-field.inline {
+  flex: 1 1 140px;
+}
+.embed-field dt {
+  color: var(--text-strong);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+}
+.embed-field dd {
+  margin: 0;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.embed-footer {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+}

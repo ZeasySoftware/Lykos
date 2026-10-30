@@ -7,6 +7,7 @@ import { useContextMenu } from '../lib/menuStore'
 import { statusOf } from '../lib/presence'
 import { memberName, useStore } from '../store'
 import { Avatar } from './Presence'
+import { BotTag } from './BotTag'
 import { Crown, MessageCircle, X } from 'lucide-react'
 
 function roleColor(color: number | null): string | undefined {
@@ -64,9 +65,12 @@ export function MemberList({ detail, onClose }: { detail: CommunityDetail; onClo
   )
   const groups = useMemo(() => {
     const online = new Set(onlineIds)
+    // Bots stehen unabhängig vom Status in einer eigenen Gruppe.
+    const humans = sorted.filter((m) => !m.user.bot)
     return [
-      { title: 'Online', items: sorted.filter((m) => online.has(m.user.id)) },
-      { title: 'Offline', items: sorted.filter((m) => !online.has(m.user.id)) },
+      { title: 'Online', items: humans.filter((m) => online.has(m.user.id)) },
+      { title: 'Offline', items: humans.filter((m) => !online.has(m.user.id)) },
+      { title: 'Bots', items: sorted.filter((m) => m.user.bot) },
     ].filter((g) => g.items.length > 0)
   }, [sorted, onlineIds])
 
@@ -158,13 +162,14 @@ const MemberRow = memo(function MemberRow({
         <span className="member-name truncate" style={{ color }}>
           {name}
         </span>
+        {m.user.bot && <BotTag />}
       </button>
       {isOwner && (
         <span className="member-owner" title="Besitzer">
           <Crown size={14} />
         </span>
       )}
-      {!isMe && (
+      {!isMe && !m.user.bot && (
         <button
           type="button"
           className="icon-button small member-message"

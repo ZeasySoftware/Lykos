@@ -66,8 +66,14 @@ pub async fn profile(
 pub async fn upload_avatar(
     State(state): State<AppState>,
     user: AuthUser,
-    mut multipart: Multipart,
+    multipart: Multipart,
 ) -> ApiResult<Json<User>> {
+    Ok(Json(set_avatar(&state, user.user_id, multipart).await?))
+}
+
+/// Avatar des Nutzers `user_id` (auch eines eigenen Bots) aus dem Multipart-Feld `file` setzen und die
+/// Änderung verteilen.
+pub async fn set_avatar(state: &AppState, user_id: Uuid, mut multipart: Multipart) -> ApiResult<User> {
     let mut field = match multipart.next_field().await {
         Ok(Some(f)) if f.name() == Some("file") => f,
         Ok(_) => return Err(ApiError::BadRequest("invalid_request")),
@@ -103,7 +109,7 @@ pub async fn upload_avatar(
          FROM users old WHERE u.id = $1 AND old.id = u.id
          RETURNING old.avatar_id",
     )
-    .bind(user.user_id)
+    .bind(user_id)
     .bind(avatar_id)
     .bind(content_type)
     .fetch_optional(&state.db)
@@ -122,23 +128,28 @@ pub async fn upload_avatar(
     if let Some(old) = old {
         attachments::delete_files(state.storage.as_ref(), &[old]).await;
     }
-    Ok(Json(announce_user_update(&state, user.user_id).await?))
+    announce_user_update(state, user_id).await
 }
 
 /// `DELETE /auth/me/avatar` – Profilbild entfernen.
 pub async fn delete_avatar(State(state): State<AppState>, user: AuthUser) -> ApiResult<Json<User>> {
+    Ok(Json(clear_avatar(&state, user.user_id).await?))
+}
+
+/// Avatar des Nutzers `user_id` entfernen und die Änderung verteilen.
+pub async fn clear_avatar(state: &AppState, user_id: Uuid) -> ApiResult<User> {
     let old: Option<Option<Uuid>> = sqlx::query_scalar(
         "UPDATE users u SET avatar_id = NULL, avatar_content_type = NULL
          FROM users old WHERE u.id = $1 AND old.id = u.id
          RETURNING old.avatar_id",
     )
-    .bind(user.user_id)
+    .bind(user_id)
     .fetch_optional(&state.db)
     .await?;
     if let Some(Some(old)) = old {
         attachments::delete_files(state.storage.as_ref(), &[old]).await;
     }
-    Ok(Json(announce_user_update(&state, user.user_id).await?))
+    announce_user_update(state, user_id).await
 }
 
 /// `GET /users/{id}/avatar/{avatar_id}` – liefert das Bild. Nur mit Sichtbarkeit (siehe `can_see_user`)

@@ -54,6 +54,23 @@ macro_rules! voice_columns {
 /// Ohne diese Rechte fliegt man aus einem Voice-Kanal.
 const REQUIRED: Permissions = Permissions(Permissions::VIEW_CHANNEL.0 | Permissions::CONNECT.0);
 
+/// Rechte, die im AFK-Kanal einer Community niemand hat – auch Administratoren und der Besitzer nicht.
+pub const AFK_DENIED: Permissions =
+    Permissions(Permissions::SPEAK.0 | Permissions::STREAM.0 | Permissions::VIDEO.0);
+
+/// Kanalrechte, eingeschränkt für den AFK-Kanal (`is_afk`): ohne Sprechen, Stream und Kamera.
+pub fn afk_restricted(perms: Permissions, is_afk: bool) -> Permissions {
+    if is_afk { perms & !AFK_DENIED } else { perms }
+}
+
+/// Ist der Kanal der AFK-Kanal seiner Community?
+pub async fn is_afk_channel(state: &AppState, channel_id: Uuid) -> ApiResult<bool> {
+    Ok(sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM communities WHERE afk_channel_id = $1)")
+        .bind(channel_id)
+        .fetch_one(&state.db)
+        .await?)
+}
+
 fn publish_update(state: &AppState, vs: &VoiceState) {
     state.events.publish(events::channel(vs.community_id, vs.channel_id), "VOICE_STATE_UPDATE", vs);
 }
@@ -459,8 +476,9 @@ pub fn is_call_kind(kind: &str) -> bool {
     kind == "voice" || models::is_dm_kind(kind)
 }
 
-/// Rechte des Nutzers im Raum des Kanals: Kanalrechte bei Sprachkanälen, `DM_CALL_PERMISSIONS` in DMs
-/// (keine bei Blockade in einer 1:1-DM). `NotFound`, wenn er den Kanal nicht sehen darf.
+/// Rechte des Nutzers im Raum des Kanals: Kanalrechte bei Sprachkanälen (im AFK-Kanal ohne `AFK_DENIED`),
+/// `DM_CALL_PERMISSIONS` in DMs (keine bei Blockade in einer 1:1-DM). `NotFound`, wenn er den Kanal nicht
+/// sehen darf.
 pub async fn call_permissions(
     state: &AppState,
     channel: &models::Channel,
@@ -469,7 +487,8 @@ pub async fn call_permissions(
     if models::is_dm_kind(&channel.kind) {
         return permissions::dm_call_permissions(&state.db, user_id, channel.id, &channel.kind).await;
     }
-    Ok(permissions::channel_permissions(&state.db, user_id, channel.id).await?.1)
+    let perms = permissions::channel_permissions(&state.db, user_id, channel.id).await?.1;
+    Ok(afk_restricted(perms, is_afk_channel(state, channel.id).await?))
 }
 
 /// Mitglied hat die Community verlassen oder wurde entfernt: aus ihrem Voice werfen.
@@ -507,12 +526,19 @@ async fn recheck(state: &AppState, community_id: Uuid) -> ApiResult<()> {
         return Ok(());
     }
     let overrides = permissions::community_overrides(&state.db, community_id).await?;
+    let afk_channel: Option<Uuid> =
+        sqlx::query_scalar("SELECT afk_channel_id FROM communities WHERE id = $1")
+            .bind(community_id)
+            .fetch_optional(&state.db)
+            .await?
+            .flatten();
     for (user_id, channel_id) in rows {
         let perms = match permissions::member_context(&state.db, user_id, community_id).await {
             Ok(ctx) => ctx.in_channel(overrides.get(&channel_id).map_or(&[], Vec::as_slice)),
             Err(ApiError::NotFound(_)) => Permissions::NONE,
             Err(e) => return Err(e),
         };
+        let perms = afk_restricted(perms, afk_channel == Some(channel_id));
         if perms.contains(REQUIRED) {
             // Darf bleiben: SPEAK/STREAM/VIDEO in LiveKit angleichen (fragt den aktuellen Stand ab).
             spawn_sync(state, channel_id, user_id, perms, None);

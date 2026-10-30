@@ -14,6 +14,7 @@ use crate::{
     events,
     models::{self, Channel, double_option},
     permissions::{self, Permissions},
+    routes::categories,
     state::AppState,
     voice,
 };
@@ -46,6 +47,8 @@ pub struct CreateBody {
     name: String,
     kind: String,
     topic: Option<String>,
+    /// Kategorie in derselben Community; fehlt/`null` = ohne Kategorie.
+    category_id: Option<Uuid>,
 }
 
 pub async fn create(
@@ -62,12 +65,16 @@ pub async fn create(
     }
     let name = normalize_channel_name(&body.name, &body.kind)?;
     let topic = normalize_topic(body.topic)?;
+    if let Some(category_id) = body.category_id {
+        categories::require_in_community(&state.db, category_id, community_id).await?;
+    }
 
     let mut tx = state.db.begin().await?;
     let channel: Channel = sqlx::query_as(concat!(
-        "INSERT INTO channels (id, community_id, name, kind, topic, position)
+        "INSERT INTO channels (id, community_id, name, kind, topic, position, category_id)
          VALUES ($1, $2, $3, $4, $5,
-                 (SELECT COALESCE(max(position) + 1, 0) FROM channels WHERE community_id = $2 AND kind = $4))
+                 (SELECT COALESCE(max(position) + 1, 0) FROM channels WHERE community_id = $2 AND kind = $4),
+                 $6)
          RETURNING ",
         crate::channel_columns!()
     ))
@@ -76,6 +83,7 @@ pub async fn create(
     .bind(&name)
     .bind(&body.kind)
     .bind(&topic)
+    .bind(body.category_id)
     .fetch_one(&mut *tx)
     .await?;
     audit::record(
@@ -84,7 +92,7 @@ pub async fn create(
         user.user_id,
         "channel.create",
         Some(channel.id),
-        json!({ "name": name, "kind": body.kind }),
+        json!({ "name": name, "kind": body.kind, "category_id": body.category_id }),
     )
     .await?;
     tx.commit().await?;
@@ -106,6 +114,9 @@ pub struct UpdateBody {
     audio_red: Option<bool>,
     #[serde(default, deserialize_with = "double_option")]
     user_limit: Option<Option<i32>>,
+    /// Kategorie wechseln (`null` = ohne Kategorie); muss zur Community des Kanals gehören.
+    #[serde(default, deserialize_with = "double_option")]
+    category_id: Option<Option<Uuid>>,
 }
 
 /// Grenzen der Kanal-Bitrate in kbit/s.
@@ -139,9 +150,12 @@ impl UpdateBody {
         Ok(())
     }
 
-    /// Geänderte Ton-Felder fürs Audit-Log.
-    fn audio_audit(&self) -> serde_json::Value {
+    /// Geänderte Ton-Felder und Kategorie fürs Audit-Log.
+    fn audit(&self) -> serde_json::Value {
         let mut changes = serde_json::Map::new();
+        if let Some(c) = self.category_id {
+            changes.insert("category_id".into(), json!(c));
+        }
         if let Some(b) = self.audio_bitrate {
             changes.insert("audio_bitrate".into(), json!(b));
         }
@@ -174,6 +188,10 @@ pub async fn update(
     let name = body.name.as_deref().map(|n| normalize_channel_name(n, &current.kind)).transpose()?;
     let topic = body.topic.clone().map(normalize_topic).transpose()?;
     body.validate_audio(&current.kind)?;
+    if let Some(Some(category_id)) = body.category_id {
+        categories::require_in_community(&state.db, category_id, ctx.community()?).await?;
+    }
+    let category_changed = body.category_id.is_some_and(|c| c != current.category_id);
 
     let mut tx = state.db.begin().await?;
     let channel: Channel = sqlx::query_as(concat!(
@@ -185,7 +203,8 @@ pub async fn update(
             audio_stereo = COALESCE($7, audio_stereo),
             audio_dtx = COALESCE($8, audio_dtx),
             audio_red = COALESCE($9, audio_red),
-            user_limit = CASE WHEN $10 THEN $11 ELSE user_limit END
+            user_limit = CASE WHEN $10 THEN $11 ELSE user_limit END,
+            category_id = CASE WHEN $12 THEN $13 ELSE category_id END
          WHERE id = $1
          RETURNING ",
         crate::channel_columns!()
@@ -201,20 +220,21 @@ pub async fn update(
     .bind(body.audio_red)
     .bind(body.user_limit.is_some())
     .bind(body.user_limit.flatten())
+    .bind(body.category_id.is_some())
+    .bind(body.category_id.flatten())
     .fetch_one(&mut *tx)
     .await?;
-    audit::record(
-        &mut *tx,
-        ctx.community()?,
-        user.user_id,
-        "channel.update",
-        Some(channel_id),
-        body.audio_audit(),
-    )
-    .await?;
+    audit::record(&mut *tx, ctx.community()?, user.user_id, "channel.update", Some(channel_id), body.audit())
+        .await?;
     tx.commit().await?;
 
-    state.events.publish(events::channel(ctx.community_id, channel_id), "CHANNEL_UPDATE", &channel);
+    let scope = events::channel(ctx.community_id, channel_id);
+    if category_changed {
+        // Welche Kategorien ein Mitglied sieht, hängt an seinen sichtbaren Kanälen (siehe `categories`).
+        state.events.publish_permissions(scope, "CHANNEL_UPDATE", &channel);
+    } else {
+        state.events.publish(scope, "CHANNEL_UPDATE", &channel);
+    }
     Ok(Json(channel))
 }
 

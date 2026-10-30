@@ -33,6 +33,10 @@ impl Permissions {
     pub const MENTION_EVERYONE: Self = Self(1 << 15);
     /// Custom-Emotes der Community hochladen, umbenennen und löschen.
     pub const MANAGE_EMOJIS: Self = Self(1 << 16);
+    /// Mitglieder bannen und Banns aufheben (Bannliste einsehen).
+    pub const BAN_MEMBERS: Self = Self(1 << 17);
+    /// Webhooks der Textkanäle anlegen, ändern, Token neu erzeugen und löschen.
+    pub const MANAGE_WEBHOOKS: Self = Self(1 << 18);
     pub const ADMINISTRATOR: Self = Self(1 << 20);
     /// Eigenen Nickname in der Community ändern.
     pub const CHANGE_NICKNAME: Self = Self(1 << 21);
@@ -40,8 +44,14 @@ impl Permissions {
     pub const MANAGE_NICKNAMES: Self = Self(1 << 22);
 
     /// Alle definierten Rechte.
-    pub const ALL: Self =
-        Self(((1 << 17) - 1) | (1 << 20) | Self::CHANGE_NICKNAME.0 | Self::MANAGE_NICKNAMES.0);
+    pub const ALL: Self = Self(
+        ((1 << 17) - 1)
+            | Self::BAN_MEMBERS.0
+            | Self::MANAGE_WEBHOOKS.0
+            | (1 << 20)
+            | Self::CHANGE_NICKNAME.0
+            | Self::MANAGE_NICKNAMES.0,
+    );
 
     /// Rechte der Standardrolle neuer Communities.
     pub const DEFAULT_ROLE: Self = Self(
@@ -354,6 +364,73 @@ pub async fn visible_channel_ids(db: &PgPool, user_id: Uuid, community_id: Uuid)
         .collect())
 }
 
+/// Discord-Rechtebits (Werte aus der Discord-API-Doku), soweit Lykos eine Entsprechung hat.
+pub mod discord {
+    pub const CREATE_INSTANT_INVITE: u64 = 1 << 0;
+    pub const KICK_MEMBERS: u64 = 1 << 1;
+    pub const BAN_MEMBERS: u64 = 1 << 2;
+    pub const ADMINISTRATOR: u64 = 1 << 3;
+    pub const MANAGE_CHANNELS: u64 = 1 << 4;
+    pub const MANAGE_GUILD: u64 = 1 << 5;
+    pub const ADD_REACTIONS: u64 = 1 << 6;
+    pub const VIEW_AUDIT_LOG: u64 = 1 << 7;
+    pub const STREAM: u64 = 1 << 9;
+    pub const VIEW_CHANNEL: u64 = 1 << 10;
+    pub const SEND_MESSAGES: u64 = 1 << 11;
+    pub const MANAGE_MESSAGES: u64 = 1 << 13;
+    pub const ATTACH_FILES: u64 = 1 << 15;
+    pub const MENTION_EVERYONE: u64 = 1 << 17;
+    pub const CONNECT: u64 = 1 << 20;
+    pub const SPEAK: u64 = 1 << 21;
+    pub const CHANGE_NICKNAME: u64 = 1 << 26;
+    pub const MANAGE_NICKNAMES: u64 = 1 << 27;
+    pub const MANAGE_ROLES: u64 = 1 << 28;
+    pub const MANAGE_WEBHOOKS: u64 = 1 << 29;
+    pub const MANAGE_GUILD_EXPRESSIONS: u64 = 1 << 30;
+}
+
+/// Zuordnung Discord-Bit → Lykos-Recht. Alles, was hier fehlt, wird beim Import verworfen.
+const DISCORD_MAP: &[(u64, Permissions)] = &[
+    (discord::CREATE_INSTANT_INVITE, Permissions::CREATE_INVITES),
+    (discord::KICK_MEMBERS, Permissions::KICK_MEMBERS),
+    (discord::BAN_MEMBERS, Permissions::BAN_MEMBERS),
+    (discord::ADMINISTRATOR, Permissions::ADMINISTRATOR),
+    (discord::MANAGE_CHANNELS, Permissions::MANAGE_CHANNELS),
+    (discord::MANAGE_GUILD, Permissions::MANAGE_COMMUNITY),
+    (discord::ADD_REACTIONS, Permissions::ADD_REACTIONS),
+    (discord::VIEW_AUDIT_LOG, Permissions::VIEW_AUDIT_LOG),
+    // Discord fasst Bildschirm und Kamera unter „Video“ (STREAM) zusammen, Lykos trennt beides.
+    (discord::STREAM, Permissions(Permissions::STREAM.0 | Permissions::VIDEO.0)),
+    (discord::VIEW_CHANNEL, Permissions::VIEW_CHANNEL),
+    (discord::SEND_MESSAGES, Permissions::SEND_MESSAGES),
+    (discord::MANAGE_MESSAGES, Permissions::MANAGE_MESSAGES),
+    (discord::ATTACH_FILES, Permissions::ATTACH_FILES),
+    (discord::MENTION_EVERYONE, Permissions::MENTION_EVERYONE),
+    (discord::CONNECT, Permissions::CONNECT),
+    (discord::SPEAK, Permissions::SPEAK),
+    (discord::CHANGE_NICKNAME, Permissions::CHANGE_NICKNAME),
+    (discord::MANAGE_NICKNAMES, Permissions::MANAGE_NICKNAMES),
+    (discord::MANAGE_ROLES, Permissions::MANAGE_ROLES),
+    (discord::MANAGE_WEBHOOKS, Permissions::MANAGE_WEBHOOKS),
+    (discord::MANAGE_GUILD_EXPRESSIONS, Permissions::MANAGE_EMOJIS),
+];
+
+/// Discord-Rechte (Bitfeld als `u64`, Discord liefert Dezimal-Strings, die über `i64` hinausgehen können)
+/// in Lykos-Rechte übersetzen. Unbekannte bzw. in Lykos nicht vorhandene Bits fallen weg.
+pub fn from_discord(bits: u64) -> Permissions {
+    DISCORD_MAP
+        .iter()
+        .filter(|(discord, _)| bits & discord != 0)
+        .fold(Permissions::NONE, |acc, (_, lykos)| acc | *lykos)
+        .sanitized()
+}
+
+/// Bits aus `bits`, die `from_discord` verwirft (für Hinweise beim Import).
+pub fn discord_unmapped(bits: u64) -> u64 {
+    let known = DISCORD_MAP.iter().fold(0, |acc, (discord, _)| acc | discord);
+    bits & !known
+}
+
 /// Gibt `Forbidden` zurück, wenn `have` das Recht `need` nicht enthält.
 pub fn require(have: Permissions, need: Permissions) -> ApiResult<()> {
     if have.contains(need) { Ok(()) } else { Err(ApiError::forbidden()) }
@@ -461,6 +538,63 @@ mod tests {
         assert!(Permissions::DEFAULT_ROLE.contains(Permissions::CHANGE_NICKNAME));
         assert!(!Permissions::DEFAULT_ROLE.contains(Permissions::MANAGE_NICKNAMES));
         assert_eq!(Permissions::MANAGE_NICKNAMES.sanitized(), Permissions::MANAGE_NICKNAMES);
+    }
+
+    #[test]
+    fn ban_members_is_known_but_not_default() {
+        assert!(Permissions::ALL.contains(Permissions::BAN_MEMBERS));
+        assert!(!Permissions::DEFAULT_ROLE.contains(Permissions::BAN_MEMBERS));
+        assert_eq!(Permissions::BAN_MEMBERS.sanitized(), Permissions::BAN_MEMBERS);
+    }
+
+    #[test]
+    fn discord_mapping() {
+        use discord as d;
+        assert_eq!(from_discord(0), Permissions::NONE);
+        assert_eq!(from_discord(d::CREATE_INSTANT_INVITE), Permissions::CREATE_INVITES);
+        assert_eq!(from_discord(d::KICK_MEMBERS), Permissions::KICK_MEMBERS);
+        assert_eq!(from_discord(d::ADMINISTRATOR), Permissions::ADMINISTRATOR);
+        assert_eq!(from_discord(d::MANAGE_CHANNELS), Permissions::MANAGE_CHANNELS);
+        assert_eq!(from_discord(d::MANAGE_GUILD), Permissions::MANAGE_COMMUNITY);
+        assert_eq!(from_discord(d::ADD_REACTIONS), Permissions::ADD_REACTIONS);
+        assert_eq!(from_discord(d::VIEW_AUDIT_LOG), Permissions::VIEW_AUDIT_LOG);
+        assert_eq!(from_discord(d::STREAM), Permissions::STREAM | Permissions::VIDEO);
+        assert_eq!(from_discord(d::VIEW_CHANNEL), Permissions::VIEW_CHANNEL);
+        assert_eq!(from_discord(d::SEND_MESSAGES), Permissions::SEND_MESSAGES);
+        assert_eq!(from_discord(d::MANAGE_MESSAGES), Permissions::MANAGE_MESSAGES);
+        assert_eq!(from_discord(d::ATTACH_FILES), Permissions::ATTACH_FILES);
+        assert_eq!(from_discord(d::MENTION_EVERYONE), Permissions::MENTION_EVERYONE);
+        assert_eq!(from_discord(d::CONNECT), Permissions::CONNECT);
+        assert_eq!(from_discord(d::SPEAK), Permissions::SPEAK);
+        assert_eq!(from_discord(d::CHANGE_NICKNAME), Permissions::CHANGE_NICKNAME);
+        assert_eq!(from_discord(d::MANAGE_NICKNAMES), Permissions::MANAGE_NICKNAMES);
+        assert_eq!(from_discord(d::MANAGE_ROLES), Permissions::MANAGE_ROLES);
+        assert_eq!(from_discord(d::MANAGE_GUILD_EXPRESSIONS), Permissions::MANAGE_EMOJIS);
+        assert_eq!(from_discord(d::BAN_MEMBERS), Permissions::BAN_MEMBERS);
+        assert_eq!(from_discord(d::MANAGE_WEBHOOKS), Permissions::MANAGE_WEBHOOKS);
+        // Ohne Entsprechung (PRIORITY_SPEAKER = 1 << 8) und unbekannte Bits fallen weg.
+        const PRIORITY_SPEAKER: u64 = 1 << 8;
+        assert_eq!(from_discord(PRIORITY_SPEAKER | 1 << 40), Permissions::NONE);
+        assert_eq!(
+            discord_unmapped(PRIORITY_SPEAKER | d::VIEW_CHANNEL | d::MANAGE_WEBHOOKS),
+            PRIORITY_SPEAKER
+        );
+        // Werte über i64::MAX bleiben gültig.
+        assert_eq!(from_discord(u64::MAX), from_discord(u64::MAX).sanitized());
+        assert!(from_discord(u64::MAX).contains(Permissions::ADMINISTRATOR | Permissions::VIEW_CHANNEL));
+        // Typische @everyone-Rechte aus der Fixture.
+        let everyone = from_discord(2_222_085_186_768_449);
+        assert!(
+            everyone.contains(Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::CONNECT)
+        );
+        assert!(!everyone.contains(Permissions::ADMINISTRATOR));
+    }
+
+    #[test]
+    fn manage_webhooks_is_known_but_not_default() {
+        assert!(Permissions::ALL.contains(Permissions::MANAGE_WEBHOOKS));
+        assert!(!Permissions::DEFAULT_ROLE.contains(Permissions::MANAGE_WEBHOOKS));
+        assert_eq!(Permissions::MANAGE_WEBHOOKS.sanitized(), Permissions::MANAGE_WEBHOOKS);
     }
 
     #[test]

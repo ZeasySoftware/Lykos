@@ -16,7 +16,7 @@ use crate::{
     gateway, instance_settings, mail, mfa,
     models::{self, User, double_option},
     rate_limit::ClientIp,
-    routes::{customization, feedback, invites, relationships, security, users},
+    routes::{bots, customization, feedback, invites, relationships, security, users},
     state::AppState,
 };
 
@@ -567,6 +567,18 @@ struct ExportMembership {
     roles: Vec<String>,
 }
 
+/// Bann in einer Community – gegen den Nutzer (`received`) oder von ihm ausgesprochen (`issued`).
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportBan {
+    community_id: Uuid,
+    community_name: String,
+    /// Gebannter Nutzer (bei `received` der Exportierende selbst).
+    user_id: Uuid,
+    reason: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    created_at: OffsetDateTime,
+}
+
 #[derive(Serialize, sqlx::FromRow)]
 struct ExportMessage {
     id: Uuid,
@@ -654,6 +666,18 @@ pub async fn export(State(state): State<AppState>, user: AuthUser) -> ApiResult<
     .fetch_all(&state.db)
     .await?;
 
+    // Banns gegen den Nutzer und von ihm ausgesprochene (ohne Daten anderer außer der Nutzer-ID).
+    let bans: Vec<ExportBan> = sqlx::query_as(
+        "SELECT b.community_id, c.name AS community_name, b.user_id, b.reason, b.created_at
+         FROM community_bans b JOIN communities c ON c.id = b.community_id
+         WHERE b.user_id = $1 OR b.banned_by = $1 ORDER BY b.created_at",
+    )
+    .bind(user.user_id)
+    .fetch_all(&state.db)
+    .await?;
+    let (bans_received, bans_issued): (Vec<ExportBan>, Vec<ExportBan>) =
+        bans.into_iter().partition(|b| b.user_id == user.user_id);
+
     // Konto-Sicherheit (Paket G): Adresse, 2FA-Stand und verknüpfte Identitäten – ohne Geheimnisse.
     let (email, has_password): (Option<String>, bool) =
         sqlx::query_as("SELECT email, password_hash IS NOT NULL FROM users WHERE id = $1")
@@ -677,6 +701,8 @@ pub async fn export(State(state): State<AppState>, user: AuthUser) -> ApiResult<
     // Freundesystem: eigene Freunde, Anfragen und Blockaden samt Einstellung.
     let relationships = relationships::export(&state.db, user.user_id).await?;
     let friend_requests = relationships::export_setting(&state.db, user.user_id).await?;
+    // Eigene Bot-Konten (ohne Token).
+    let bots = bots::owned_by(&state.db, user.user_id).await?;
 
     let now = OffsetDateTime::now_utc();
     let body = serde_json::json!({
@@ -695,8 +721,10 @@ pub async fn export(State(state): State<AppState>, user: AuthUser) -> ApiResult<
         "memberships": memberships,
         "messages": messages,
         "attachments": attachments,
+        "community_bans": { "received": bans_received, "issued": bans_issued },
         "feedback": feedback,
         "relationships": relationships,
+        "bots": bots,
         "privacy": { "friend_requests": friend_requests },
     });
     let filename = format!("lykos-export-{}-{}.json", me.username, now.date());

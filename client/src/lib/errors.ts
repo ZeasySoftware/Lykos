@@ -28,8 +28,19 @@ const messages: Record<string, string> = {
   aborted: 'Upload abgebrochen.',
   not_a_voice_channel: 'Das ist kein Sprachkanal.',
   invalid_bitrate: 'Die Bitrate muss zwischen 32 und 256 kbit/s liegen.',
+  too_many_webhooks: 'Dieser Kanal hat bereits 15 Webhooks.',
+  too_many_bots: 'Du hast bereits 10 Bots. Lösche einen, um einen neuen anzulegen.',
+  bots_disabled: 'Bots sind auf dieser Instanz abgeschaltet.',
+  bots_not_allowed: 'Bots dürfen das nicht.',
+  unknown_bot: 'Bot nicht gefunden – prüfe die ID. Fremde Bots gehen nur, wenn ihr Besitzer sie öffentlich gemacht hat.',
   invalid_user_limit: 'Das Nutzerlimit muss zwischen 1 und 99 liegen.',
   channel_full: 'Dieser Sprachkanal ist voll.',
+  invalid_category: 'Diese Kategorie gibt es in der Community nicht.',
+  too_many_categories: 'Diese Community hat schon die höchstmögliche Zahl an Kategorien.',
+  invalid_template_code: 'Kein gültiger Vorlagen-Link. Erwartet wird z. B. https://discord.new/… oder der Code.',
+  template_not_found: 'Diese Discord-Vorlage gibt es nicht (mehr).',
+  template_fetch_failed: 'Discord ist gerade nicht erreichbar. Bitte später erneut versuchen.',
+  invalid_template: 'Die Vorlage konnte nicht gelesen werden oder ist zu groß.',
   voice_unavailable: 'Sprachkanäle sind auf dieser Instanz nicht eingerichtet.',
   invalid_image: 'Bitte ein Bild im Format PNG, JPEG, WebP oder GIF wählen.',
   invalid_bio: '„Über mich“ darf höchstens 190 Zeichen lang sein.',
@@ -50,6 +61,7 @@ const messages: Record<string, string> = {
   invalid_emoji: 'Dieses Emoji gibt es nicht (mehr).',
   too_many_reactions: 'Höchstens 20 verschiedene Reaktionen pro Nachricht.',
   too_many_pins: 'In diesem Kanal sind schon 50 Nachrichten angepinnt – löse zuerst eine.',
+  too_many_dm_pins: 'Du hast schon 20 Unterhaltungen angepinnt – löse zuerst eine.',
   invalid_reply: 'Die Nachricht, auf die du antwortest, gibt es nicht mehr.',
   too_many_emojis: 'Diese Community hat bereits 100 Emojis.',
   emoji_name_taken: 'Ein Emoji mit diesem Namen gibt es schon.',
@@ -65,7 +77,12 @@ const messages: Record<string, string> = {
   gitea_unavailable: 'Gitea ist gerade nicht erreichbar oder hat das Issue abgelehnt.',
   invalid_pronouns: 'Pronomen: höchstens 40 Zeichen, eine Zeile.',
   invalid_color: 'Ungültige Farbe.',
-  invalid_channel: 'Bitte einen Textkanal dieser Community wählen.',
+  invalid_channel: 'Bitte einen passenden Kanal dieser Community wählen.',
+  // Moderation
+  banned: 'Du wurdest aus dieser Community gebannt. Ein Beitritt ist erst wieder möglich, wenn die Verwaltung den Bann aufhebt.',
+  cannot_ban_self: 'Dich selbst kannst du nicht bannen.',
+  invalid_reason: 'Der Grund darf höchstens 512 Zeichen lang sein.',
+  invalid_welcome_message: 'Der Willkommenstext darf höchstens 500 Zeichen lang sein.',
   // Instanz-Verwaltung (Paket H)
   account_disabled: 'Dieses Konto ist gesperrt. Wende dich an die Verwaltung der Instanz.',
   community_creation_disabled: 'Auf dieser Instanz dürfen nur Admins Communities anlegen.',
@@ -98,6 +115,14 @@ const messages: Record<string, string> = {
   last_login_method:
     'Das ist dein einziger Anmeldeweg. Lege zuerst ein Passwort fest oder verknüpfe einen anderen Anbieter.',
   oidc_unavailable: 'Der Anmeldedienst ist gerade nicht erreichbar.',
+  // AutoMod
+  automod_blocked: 'Der AutoMod dieser Community hat die Nachricht blockiert.',
+  invalid_keyword: 'Ein Begriff ist ungültig: höchstens 60 Zeichen, `*` nur am Anfang oder Ende (Ausnahmen ohne `*`), höchstens 1000 Einträge.',
+  invalid_domain: 'Eine Domain ist ungültig (z. B. example.org) oder es sind mehr als 200.',
+  invalid_limit: 'Ein Grenzwert liegt außerhalb des erlaubten Bereichs.',
+  invalid_message: 'Die eigene Meldung darf höchstens 150 Zeichen lang sein.',
+  invalid_actions: 'Eine aktive Regel braucht mindestens eine Aktion.',
+  alert_channel_required: 'Für Alarme bitte einen Protokollkanal wählen.',
 }
 
 /** Fehlercodes aus dem URL-Fragment nach der Rückkehr vom OIDC-Anbieter. */
@@ -115,6 +140,9 @@ export function oidcErrorText(code: string): string {
 /** Fehler in eine deutsche Meldung für die Oberfläche übersetzen. */
 export function errorText(e: unknown): string {
   if (e instanceof ApiError && e.status === 429) return messages.rate_limited
+  if (e instanceof ApiError && e.code === 'automod_blocked' && typeof e.data.message === 'string' && e.data.message) {
+    return e.data.message
+  }
   if (e instanceof ApiError) return messages[e.code] ?? `Fehler (${e.status}: ${e.code})`
   return 'Unerwarteter Fehler.'
 }

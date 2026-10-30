@@ -5,6 +5,8 @@
 import { buildSystemMessageMenu, buildUserMenu, deleteMessage } from '../../lib/contextMenus'
 import { useContextMenu } from '../../lib/menuStore'
 import type { Community, InvitePreview, Message } from '../../lib/api'
+import { Markdown } from '../../lib/markdown'
+import type { MarkdownOptions } from '../../lib/markdown'
 import { useMemberName, useStore } from '../../store'
 import { accentStyle } from '../../lib/customize'
 import { BannerFill, CommunityIcon } from './parts'
@@ -34,7 +36,8 @@ export function CommunityInfoCard({ community }: { community: Community }) {
           <p className="muted small">Keine Beschreibung.</p>
         )}
         <span className="muted small">
-          {members ? `${members.length} Mitglieder · ` : ''}Seit {dateFmt.format(new Date(community.created_at))}
+          {members ? `${members.length} ${members.length === 1 ? 'Mitglied' : 'Mitglieder'} · ` : ''}
+          Seit {dateFmt.format(new Date(community.created_at))}
         </span>
       </div>
     </div>
@@ -74,7 +77,9 @@ export function InviteCard({
         <strong className="invite-card-name">{instance ? (preview.instance_name ?? 'Lykos') : c.name}</strong>
         {instance && <span className="muted small">und trittst automatisch „{c.name}“ bei</span>}
         {c.description && <p className="invite-card-description">{c.description}</p>}
-        <span className="muted small">{preview.member_count} Mitglieder</span>
+        <span className="muted small">
+          {preview.member_count} {preview.member_count === 1 ? 'Mitglied' : 'Mitglieder'}
+        </span>
       </div>
     </div>
   )
@@ -86,8 +91,18 @@ const JOIN_TEXTS: [string, string][] = [
   ['', ' ist zum Rudel gestoßen.'],
 ]
 
-/** Systemnachricht im Verlauf: Beitritt eines Mitglieds (`kind = member_join`). */
-export function SystemMessage({ message, canDelete }: { message: Message; canDelete: boolean }) {
+/** Systemnachricht im Verlauf: Beitritt eines Mitglieds (`kind = member_join`). Mit eigenem Willkommenstext
+ * der Community (Inhalt nicht leer) wird dieser wie eine normale Nachricht als Markdown gezeigt, sonst einer der
+ * Standardsätze. */
+export function SystemMessage({
+  message,
+  canDelete,
+  markdown,
+}: {
+  message: Message
+  canDelete: boolean
+  markdown?: MarkdownOptions
+}) {
   const openProfile = useStore((s) => s.openProfile)
   const name = useMemberName(message.community_id, message.author)
   const menu = useContextMenu(() => buildSystemMessageMenu(message, canDelete), 'Systemnachricht')
@@ -100,9 +115,15 @@ export function SystemMessage({ message, canDelete }: { message: Message; canDel
   )
   // Gleiche Nachricht → gleicher Text auf allen Geräten.
   const [before, after] = JOIN_TEXTS[message.id.charCodeAt(message.id.length - 1) % JOIN_TEXTS.length]
+  const custom = message.content.trim() !== ''
   return (
     <div className="message system-message" data-message-id={message.id} {...menu}>
       <UserPlus size={16} className="system-message-icon" aria-hidden="true" />
+      {custom ? (
+        <div className="system-message-text system-message-custom">
+          <Markdown content={message.content} options={{ ...markdown, jumbo: false }} />
+        </div>
+      ) : (
       <span className="system-message-text">
         {before}
         {message.author ? (
@@ -120,6 +141,7 @@ export function SystemMessage({ message, canDelete }: { message: Message; canDel
         )}
         {after}
       </span>
+      )}
       <time className="message-time" dateTime={message.created_at}>
         {timeFmt.format(new Date(message.created_at))}
       </time>

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Lykos",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "identifier": "dev.zeasy.lykos",
   "build": {
     "frontendDist": "../dist",
@@ -24,6 +24,7 @@
         "decorations": false,
         "shadow": true,
         "visible": false,
+        "dragDropEnabled": false,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI --disable-background-timer-throttling --disable-renderer-backgrounding"
       }
     ],

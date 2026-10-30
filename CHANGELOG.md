@@ -8,6 +8,67 @@ Patch = Fehlerbehebungen). Migrationen laufen beim Serverstart automatisch.
 
 ## [Unveröffentlicht]
 
+## [0.6.0] – 2026-10-30
+
+### Hinzugefügt
+
+- **Direktnachrichten anpinnen:** Unterhaltungen und Gruppen lassen sich für sich selbst anpinnen (bis 20) und
+  stehen dann im Abschnitt „Angepinnt“ ganz oben – auf allen eigenen Geräten gleich. Über das Kontextmenü oder das
+  Pin-Symbol am Eintrag.
+- **Personen hinzufügen:** Im Kopf einer DM, im Kontextmenü und unter „Gruppe bearbeiten“. In einer Gruppe kommen
+  die Ausgewählten dazu (mit Hinweis im Verlauf, ein laufender Anruf geht weiter), aus einer 1:1-DM entsteht eine
+  neue Gruppe – die Unterhaltung zu zweit bleibt.
+- **Gruppe erstellen:** Eigener Knopf in der DM-Seitenleiste mit Gruppenname und Personenauswahl; eine Gruppe geht
+  auch mit nur einer weiteren Person oder erst einmal allein (`POST /dms` mit `group: true`).
+- **AutoMod** pro Community (Einstellungen → „AutoMod“, `MANAGE_COMMUNITY`): Wortfilter mit Platzhaltern und Ausnahmen,
+  Links nur zu erlaubten Domains, Erwähnungs-Spam und Flut/Wiederholungen. Je Regel blockieren, Alarm in einen
+  Protokollkanal und/oder Audit-Log; Ausnahmen für Rollen und Kanäle, Verwalter sind ausgenommen. Prüft auch
+  bearbeitete Nachrichten – auch von Bots (wie Mitglieder, mit ihren Rollen) und Webhooks.
+- **Bannen:** im Mitglieder-Kontextmenü, auf der Profilkarte und in der Mitgliederliste der Einstellungen, mit
+  optionalem Grund und „Nachrichten der letzten Stunde … 7 Tage löschen“. Gebannte fliegen sofort raus und kommen
+  über keine Einladung zurück; neuer Tab „Banns“ mit Suche und „Bann aufheben“. Neues Recht „Mitglieder bannen“
+  (`BAN_MEMBERS`) – Rollen, die bisher Mitglieder entfernen durften, bekommen es automatisch.
+- **AFK-Kanal:** In der Übersicht der Community-Einstellungen wählbar (Sprachkanal + 1/5/15/30/60 Minuten). Wer so lange
+  weder spricht noch die App bedient, wechselt automatisch dorthin (nicht beim Streamen oder mit Kamera); im
+  AFK-Kanal kann niemand sprechen, streamen oder die Kamera nutzen. Markiert mit einem Mond in der Kanalleiste.
+- **Willkommensnachricht:** Beitrittsmeldungen abschaltbar, optional eigener Text mit `{user}` und `{community}` (Markdown,
+  Vorschau in „Darstellung“).
+- **Kanal-Kategorien** wie bei Discord: einklappbare Gruppen in der Seitenleiste, „Kategorie erstellen“ im
+  Community-Menü, umbenennen/löschen/„Kanal hier erstellen“ an der Kategorie, Kategorie-Auswahl beim Anlegen und in
+  den Kanal-Einstellungen. Bestehende Communities sehen unverändert aus.
+- **Import aus Discord-Servervorlagen** beim Anlegen einer Community (`discord.new/…`-Link): Vorschau, dann werden Rollen,
+  Kategorien, Kanäle, Kanal-Rechte, Systemkanal, AFK-Kanal und Beschreibung übernommen. Nachrichten, Mitglieder, Emotes und Bots
+  nicht. Der Server ruft dafür die öffentliche Discord-API ab (nur den Vorlagen-Code, ohne Nutzerdaten).
+- **Eingehende Webhooks** pro Textkanal (neues Recht „Webhooks verwalten“, `MANAGE_WEBHOOKS = 1 << 18`): anlegen,
+  umbenennen, Avatar, Kanal wechseln, Token neu erzeugen, löschen – mit Audit-Log. Ausführen ohne Anmeldung unter
+  `POST /api/webhooks/{id}/{token}`, kompatibel mit Discord-Webhooks (Gitea/Forgejo, Grafana, Uptime Kuma, Skripte):
+  `content`, `username`, Embeds als Karten, `allowed_mentions` (Standard: kein `@everyone`), `?wait=true`,
+  Bearbeiten/Löschen eigener Nachrichten, 30 Aufrufe pro Minute. Aus Datenschutzgründen lädt Lykos keine fremden
+  Bilder: `avatar_url` und Bilder in Embeds werden ignoriert. Dateien per Webhook gehen (noch) nicht.
+- **Bot-Konten:** Unter Einstellungen → „Entwickler“ eigene Bots anlegen (bis 10), Token anzeigen/neu erzeugen,
+  löschen; Anmeldung mit `Authorization: Bot <token>` für REST und Gateway, Konto-/Freundes-/DM-Endpunkte sind für
+  Bots gesperrt. Bots per ID zur Community hinzufügen (eigene oder öffentliche), eigene Gruppe „Bots“ in der
+  Mitgliederliste, BOT-Kennzeichen an Namen. Instanz-Admins können Bots abschalten. Anleitung: `docs/bots.md`.
+
+### Geändert
+
+- Neue Communities nutzen ihren ersten Textkanal als Systemkanal für Beitrittsmeldungen.
+- Der Kopf der DM-Seitenleiste heißt „Nachrichten“.
+
+### Behoben
+
+- Desktop: Dateien lassen sich wieder per Drag-and-drop in die App ziehen (Tauri fing Drops selbst ab).
+
+### Betrieb
+
+- Migrationen **0022–0026**: DM-Pins (`dm_recipients.pinned_at`, Nachrichtenart `recipient_add`), Kanal-Kategorien
+  (`channel_categories`, `channels.category_id`), Banns/AFK/Willkommen (`community_bans`, neue Community-Spalten,
+  Recht `BAN_MEMBERS = 1 << 17`), AutoMod (`automod_rules`, Nachrichtenart `automod_alert`), Webhooks/Bots
+  (`webhooks`, `bots`, neue Spalten in `users` und `messages`, Recht `MANAGE_WEBHOOKS = 1 << 18`). Vor dem Update
+  ein Datenbank-Backup anlegen.
+- Der Discord-Import ruft `https://discord.com/api/v10/guilds/templates/{code}` vom Server aus ab (ausgehende
+  HTTPS-Verbindung zu discord.com nötig).
+
 ## [0.5.1] – 2026-10-30
 
 ### Hinzugefügt

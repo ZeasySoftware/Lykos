@@ -37,6 +37,8 @@ use crate::{
 pub const DESCRIPTION_MAX_CHARS: usize = 300;
 /// Höchstlänge der Pronomen (Zeichen).
 pub const PRONOUNS_MAX_CHARS: usize = 40;
+/// Höchstlänge des eigenen Willkommenstexts (vor dem Einsetzen der Platzhalter).
+pub const WELCOME_MAX_CHARS: usize = 500;
 
 /// Community-Icon: der Client liefert 256 px (animierte GIFs bis 1 MB unverändert).
 pub const ICON_MAX_BYTES: usize = 2 * 1024 * 1024;
@@ -63,13 +65,17 @@ pub fn validate_color(color: Option<i32>) -> ApiResult<()> {
 
 // --- Hochladen, Speichern, Ausliefern -----------------------------------------
 
-struct ImageUpload {
-    data: Vec<u8>,
-    content_type: &'static str,
+pub(crate) struct ImageUpload {
+    pub data: Vec<u8>,
+    pub content_type: &'static str,
 }
 
 /// Liest genau ein Multipart-Feld `file` und prüft Typ (PNG/JPEG/WebP/GIF), Größe und Maße.
-async fn read_image(mut multipart: Multipart, max_bytes: usize, max_side: i32) -> ApiResult<ImageUpload> {
+pub(crate) async fn read_image(
+    mut multipart: Multipart,
+    max_bytes: usize,
+    max_side: i32,
+) -> ApiResult<ImageUpload> {
     let mut field = match multipart.next_field().await {
         Ok(Some(f)) if f.name() == Some("file") => f,
         Ok(_) => return Err(ApiError::BadRequest("invalid_request")),
@@ -92,7 +98,7 @@ async fn read_image(mut multipart: Multipart, max_bytes: usize, max_side: i32) -
 }
 
 /// Legt das Bild unter einer neuen ID im Speicher ab.
-async fn store(state: &AppState, image: Vec<u8>) -> ApiResult<Uuid> {
+pub(crate) async fn store(state: &AppState, image: Vec<u8>) -> ApiResult<Uuid> {
     let id = Uuid::now_v7();
     let key = id.to_string();
     let body = Bytes::from(image);
@@ -105,7 +111,7 @@ async fn store(state: &AppState, image: Vec<u8>) -> ApiResult<Uuid> {
 }
 
 /// Liefert ein gespeichertes Bild aus (nur die vier Inline-Bildtypen).
-async fn serve(
+pub(crate) async fn serve(
     state: &AppState,
     id: Uuid,
     content_type: Option<String>,
@@ -462,25 +468,66 @@ pub async fn user_banner(
 
 // --- Systemnachrichten ------------------------------------------------------------
 
-/// Schreibt „X ist beigetreten“ in den Systemkanal der Community (falls gesetzt) und verteilt sie.
-/// Systemnachrichten haben `kind = member_join`, leeren Inhalt und den neuen Nutzer als Autor.
+/// Setzt die Platzhalter des Willkommenstexts ein: `{user}` → Erwähnung `@name`, `{community}` → Name.
+/// Das Ergebnis wird auf die normale Nachrichtenlänge gekürzt.
+pub fn render_welcome(template: &str, username: &str, community_name: &str) -> String {
+    let text = template.replace("{user}", &format!("@{username}")).replace("{community}", community_name);
+    text.chars().take(messages::MAX_CONTENT_CHARS).collect()
+}
+
+/// Schreibt „X ist beigetreten“ in den Systemkanal der Community (falls gesetzt und Beitrittsmeldungen
+/// nicht abgeschaltet sind) und verteilt sie. Systemnachrichten haben `kind = member_join` und den neuen
+/// Nutzer als Autor; der Inhalt ist leer (Client wählt einen Standardsatz) oder der eigene Willkommenstext
+/// der Community mit eingesetzten Platzhaltern – `{user}` zählt dann als Erwähnung des Neuen.
 pub async fn post_join_message(state: &AppState, community_id: Uuid, user_id: Uuid) -> ApiResult<()> {
-    let channel_id: Option<Uuid> = sqlx::query_scalar(
-        "SELECT ch.id FROM communities c JOIN channels ch ON ch.id = c.system_channel_id
-         WHERE c.id = $1 AND ch.community_id = c.id AND ch.kind = 'text'",
+    let row: Option<(Uuid, Option<String>, String, String)> = sqlx::query_as(
+        "SELECT ch.id, c.welcome_message, c.name, u.username
+         FROM communities c JOIN channels ch ON ch.id = c.system_channel_id
+         JOIN users u ON u.id = $2
+         WHERE c.id = $1 AND c.join_messages_enabled AND ch.community_id = c.id AND ch.kind = 'text'",
     )
     .bind(community_id)
+    .bind(user_id)
     .fetch_optional(&state.db)
     .await?;
-    let Some(channel_id) = channel_id else { return Ok(()) };
+    let Some((channel_id, template, community_name, username)) = row else { return Ok(()) };
+    let content =
+        template.as_deref().map_or_else(String::new, |t| render_welcome(t, &username, &community_name));
+    let mentions_user = template.as_deref().is_some_and(|t| t.contains("{user}"));
+
     let id = Uuid::now_v7();
+    let mut tx = state.db.begin().await?;
     sqlx::query(
-        "INSERT INTO messages (id, channel_id, author_id, content, kind) VALUES ($1, $2, $3, '', 'member_join')",
+        "INSERT INTO messages (id, channel_id, author_id, content, kind) VALUES ($1, $2, $3, $4, 'member_join')",
     )
     .bind(id)
     .bind(channel_id)
     .bind(user_id)
-    .execute(&state.db)
+    .bind(&content)
+    .execute(&mut *tx)
     .await?;
+    if mentions_user {
+        sqlx::query("INSERT INTO message_mentions (message_id, user_id) VALUES ($1, $2)")
+            .bind(id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
     messages::broadcast(state, "MESSAGE_CREATE", id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_welcome;
+
+    #[test]
+    fn welcome_placeholders() {
+        assert_eq!(
+            render_welcome("Hallo {user}, willkommen bei **{community}**! {user}", "wolf", "Rudel"),
+            "Hallo @wolf, willkommen bei **Rudel**! @wolf"
+        );
+        assert_eq!(render_welcome("Ohne Platzhalter", "wolf", "Rudel"), "Ohne Platzhalter");
+        assert_eq!(render_welcome("{nix}", "wolf", "Rudel"), "{nix}");
+    }
 }

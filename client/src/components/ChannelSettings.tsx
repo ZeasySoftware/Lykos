@@ -8,12 +8,15 @@ import { errorText } from '../lib/errors'
 import { PERMISSIONS, covers, roleColor } from '../lib/permissionLabels'
 import { Permission, has } from '../lib/permissions'
 import { sortRoles } from '../lib/roles'
+import { sortedCategories } from '../lib/categories'
+import { CategorySelect } from './Dialogs'
 import { useUnsavedChanges, useUnsavedGuard } from '../lib/unsaved'
 import { channelLabel, useStore } from '../store'
 import { EmojiInput, EmojiTextarea } from './EmojiButton'
 import { SettingsLayer, SettingsPage, SettingsSection } from './SettingsLayer'
 import type { SettingsGroup } from './SettingsLayer'
 import { SwitchRow } from './Switch'
+import { WebhooksTab } from './WebhooksTab'
 import { Check, Circle, Minus, Trash2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -44,7 +47,19 @@ export function ChannelSettings({
   const perms = detail.channel_permissions[channel.id] ?? detail.permissions
   const canManage = has(perms, Permission.MANAGE_CHANNELS)
   const canRoles = has(perms, Permission.MANAGE_ROLES)
-  const current: ChannelTab = tab === 'permissions' && canRoles ? 'permissions' : canManage ? 'overview' : 'permissions'
+  const canWebhooks = channel.kind === 'text' && has(perms, Permission.MANAGE_WEBHOOKS)
+  const current: ChannelTab =
+    tab === 'webhooks' && canWebhooks
+      ? 'webhooks'
+      : tab === 'permissions' && canRoles
+        ? 'permissions'
+        : canManage
+          ? 'overview'
+          : canRoles
+            ? 'permissions'
+            : canWebhooks
+              ? 'webhooks'
+              : 'permissions'
 
   const groups: SettingsGroup<Section>[] = [
     {
@@ -52,6 +67,7 @@ export function ChannelSettings({
       items: [
         { id: 'overview', label: 'Übersicht', hidden: !canManage },
         { id: 'permissions', label: 'Berechtigungen', hidden: !canRoles },
+        { id: 'webhooks', label: 'Integrationen', hidden: !canWebhooks },
       ],
     },
     {
@@ -85,9 +101,10 @@ export function ChannelSettings({
       onAction={onAction}
       onClose={onClose}
     >
-      {current === 'overview' && canManage && <OverviewTab key={channel.id} channel={channel} />}
+      {current === 'overview' && canManage && <OverviewTab key={channel.id} channel={channel} detail={detail} />}
       {current === 'permissions' && canRoles && <PermissionsTab detail={detail} channel={channel} myPerms={perms} />}
-      {!canManage && !canRoles && <p className="muted">Du darfst diesen Kanal nicht verwalten.</p>}
+      {current === 'webhooks' && canWebhooks && <WebhooksTab detail={detail} channel={channel} />}
+      {!canManage && !canRoles && !canWebhooks && <p className="muted">Du darfst diesen Kanal nicht verwalten.</p>}
     </SettingsLayer>
   )
 }
@@ -121,15 +138,18 @@ function sameAudio(a: AudioForm, b: AudioForm): boolean {
   )
 }
 
-function OverviewTab({ channel }: { channel: Channel }) {
+function OverviewTab({ channel, detail }: { channel: Channel; detail: CommunityDetail }) {
   const [name, setName] = useState(channel.name)
   const [topic, setTopic] = useState(channel.topic ?? '')
+  const [category, setCategory] = useState(channel.category_id ?? '')
+  const categories = sortedCategories(detail.categories)
+  const categoryDirty = category !== (channel.category_id ?? '')
   const [audio, setAudio] = useState<AudioForm>(() => audioForm(channel))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isVoice = channel.kind === 'voice'
   const audioDirty = isVoice && !sameAudio(audio, audioForm(channel))
-  const dirty = name.trim() !== channel.name || topic.trim() !== (channel.topic ?? '') || audioDirty
+  const dirty = name.trim() !== channel.name || topic.trim() !== (channel.topic ?? '') || audioDirty || categoryDirty
 
   async function save() {
     if (!name.trim()) {
@@ -142,6 +162,7 @@ function OverviewTab({ channel }: { channel: Channel }) {
       const updated = await endpoints.updateChannel(channel.id, {
         name: name.trim(),
         topic: topic.trim() || null,
+        ...(categoryDirty ? { category_id: category || null } : {}),
         ...(audioDirty
           ? {
               audio_bitrate: audio.bitrate,
@@ -154,6 +175,7 @@ function OverviewTab({ channel }: { channel: Channel }) {
       })
       setName(updated.name)
       setTopic(updated.topic ?? '')
+      setCategory(updated.category_id ?? '')
       setAudio(audioForm(updated))
     } catch (err) {
       setError(errorText(err))
@@ -165,6 +187,7 @@ function OverviewTab({ channel }: { channel: Channel }) {
   function reset() {
     setName(channel.name)
     setTopic(channel.topic ?? '')
+    setCategory(channel.category_id ?? '')
     setAudio(audioForm(channel))
     setError(null)
   }
@@ -195,6 +218,12 @@ function OverviewTab({ channel }: { channel: Channel }) {
             placeholder="Worum geht es in diesem Kanal?"
           />
         </label>
+        {(categories.length > 0 || channel.category_id) && (
+          <label className="field">
+            <span>Kategorie</span>
+            <CategorySelect categories={categories} value={category} onChange={setCategory} />
+          </label>
+        )}
         {isVoice && (
           <SettingsSection
             title="Ton"

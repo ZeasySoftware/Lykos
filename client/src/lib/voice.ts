@@ -154,6 +154,8 @@ function channelCapabilities(communityId: string | null, channelId: string): Cap
   }
   const detail = useStore.getState().details[communityId]
   if (!detail?.channels.some((c) => c.id === channelId)) return null
+  // Im AFK-Kanal der Community nur zuhören (der Server gibt dort kein SPEAK/STREAM/VIDEO).
+  if (detail.community.afk_channel_id === channelId) return { canSpeak: false, canStream: false, canVideo: false }
   const perms = detail.channel_permissions[channelId] ?? detail.permissions
   return {
     canSpeak: has(perms, Permission.SPEAK),

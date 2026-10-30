@@ -80,6 +80,8 @@ export function memberRules(input: MemberRuleInput) {
     nickname,
     roles: isMember && has(myPerms, Permission.MANAGE_ROLES),
     kick: isMember && !isSelf && !targetIsOwner && has(myPerms, Permission.KICK_MEMBERS),
+    /** Bannen folgt (wie serverseitig) der Rollenhierarchie. */
+    ban: isMember && !isSelf && !targetIsOwner && has(myPerms, Permission.BAN_MEMBERS) && targetBelowMe(input),
   }
 }
 
@@ -123,13 +125,26 @@ export function channelRules(input: { channelPerms: number; communityPerms: numb
   return {
     markRead: kind === 'text',
     invite: has(communityPerms, Permission.CREATE_INVITES),
-    edit: has(channelPerms, Permission.MANAGE_CHANNELS) || has(channelPerms, Permission.MANAGE_ROLES),
+    edit:
+      has(channelPerms, Permission.MANAGE_CHANNELS) ||
+      has(channelPerms, Permission.MANAGE_ROLES) ||
+      (kind === 'text' && has(channelPerms, Permission.MANAGE_WEBHOOKS)),
     delete: has(channelPerms, Permission.MANAGE_CHANNELS),
     connect: kind === 'voice' && has(channelPerms, Permission.CONNECT),
   }
 }
 
-export type CommunityTabId = 'overview' | 'appearance' | 'emojis' | 'roles' | 'members' | 'invites' | 'audit' | 'danger'
+export type CommunityTabId =
+  | 'overview'
+  | 'appearance'
+  | 'emojis'
+  | 'roles'
+  | 'members'
+  | 'bans'
+  | 'invites'
+  | 'automod'
+  | 'audit'
+  | 'danger'
 
 /** Bereiche der Community-Einstellungen, die der Nutzer sehen darf. */
 export function communityTabs(perms: number, isOwner: boolean): { id: CommunityTabId; label: string }[] {
@@ -143,10 +158,13 @@ export function communityTabs(perms: number, isOwner: boolean): { id: CommunityT
       visible:
         has(perms, Permission.MANAGE_ROLES) ||
         has(perms, Permission.KICK_MEMBERS) ||
+        has(perms, Permission.BAN_MEMBERS) ||
         has(perms, Permission.MANAGE_NICKNAMES),
     },
+    { id: 'bans', label: 'Banns', visible: has(perms, Permission.BAN_MEMBERS) },
     { id: 'invites', label: 'Einladungen', visible: has(perms, Permission.MANAGE_COMMUNITY) },
     { id: 'emojis', label: 'Emojis', visible: has(perms, Permission.MANAGE_EMOJIS) },
+    { id: 'automod', label: 'AutoMod', visible: has(perms, Permission.MANAGE_COMMUNITY) },
     { id: 'audit', label: 'Audit-Log', visible: has(perms, Permission.VIEW_AUDIT_LOG) },
     { id: 'danger', label: isOwner ? 'Community löschen' : 'Community verlassen', visible: true },
   ]

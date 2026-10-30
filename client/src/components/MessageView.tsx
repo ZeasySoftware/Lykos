@@ -15,10 +15,12 @@ import { Permission, has } from '../lib/permissions'
 import { isNewer } from '../lib/unread'
 import { blockedLabel, blockedRunStart, blockedRuns } from '../lib/friends'
 import { useFriends } from '../lib/friendsStore'
-import { channelLabel, displayName, lastMessageOf, mentionsUser, readStateOf, useMemberName, useStore } from '../store'
+import { channelLabel, displayName, lastMessageOf, mentionsUser, readStateOf, senderName, useMemberName, useStore } from '../store'
 import { useUploads } from '../lib/uploads'
 import { useFileDrop, usePasteFiles } from '../lib/fileInput'
 import { AttachButton, AttachmentList, DropOverlay, Lightbox, PendingUploads } from './Attachments'
+import { BotTag } from './BotTag'
+import { EmbedList } from './Embeds'
 import { PinnedMessages } from './PinnedMessages'
 import { DrawerButton } from './MobileNav'
 import { EmojiPicker, ReactionBar } from './Reactions'
@@ -29,7 +31,9 @@ import { TypingIndicator } from './TypingIndicator'
 import { AutoGrowTextarea } from './AutoGrowTextarea'
 import { useAutoGrow } from '../lib/autoGrow'
 import { SystemMessage } from './customize/CommunityView'
+import { AutoModAlert } from './AutoModAlert'
 import { CallMissedMessage, DmCallButtons, DmCallSection } from './DmCall'
+import { DmAddPeopleButton, RecipientAddMessage } from './DirectMessages'
 import {
   AtSign,
   Bell,
@@ -289,6 +293,7 @@ export function MessageView({
         )}
         <span className="pane-actions">
           {isDm && <DmCallButtons channelId={channel.id} />}
+          {isDm && <DmAddPeopleButton channelId={channel.id} />}
           <PinnedMessages channel={channel} canManage={canPin} markdown={markdown} onJump={jumpTo} />
           {isDesktopBundle && (
             <button
@@ -348,9 +353,13 @@ export function MessageView({
               </div>
             )}
             {hidden ? null : m.kind === 'member_join' ? (
-              <SystemMessage message={m} canDelete={canManage || m.author?.id === user?.id} />
+              <SystemMessage message={m} canDelete={canManage || m.author?.id === user?.id} markdown={markdown} />
+            ) : m.kind === 'recipient_add' ? (
+              <RecipientAddMessage message={m} />
             ) : m.kind === 'call_missed' ? (
               <CallMissedMessage message={m} />
+            ) : m.kind === 'automod_alert' ? (
+              <AutoModAlert message={m} canDelete={canManage} />
             ) : (
               <MessageItem
                 message={m}
@@ -449,8 +458,16 @@ function asMember(user: UserPublic): Member {
   return { user, nickname: null, role_ids: [], joined_at: '' }
 }
 
+/** Gleicher Absender: derselbe Nutzer oder derselbe Webhook unter demselben Namen. */
+function sameSender(a: Message, b: Message): boolean {
+  if (a.webhook || b.webhook) {
+    return !!a.webhook && !!b.webhook && !!a.webhook_id && a.webhook_id === b.webhook_id && a.webhook.name === b.webhook.name
+  }
+  return !!a.author && !!b.author && a.author.id === b.author.id
+}
+
 function isGrouped(prev: Message | undefined, m: Message): boolean {
-  if (!prev || !prev.author || !m.author || prev.author.id !== m.author.id || m.reply_to_id) return false
+  if (!prev || !sameSender(prev, m) || m.reply_to_id) return false
   // Nach Systemnachrichten (z. B. Beitritt) beginnt immer ein neuer Block.
   if (prev.kind && prev.kind !== 'default') return false
   return new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < GROUP_WINDOW_MS
@@ -471,7 +488,7 @@ function ReplyPreview({ message, onJump }: { message: Message; onJump: (id: stri
   return (
     <button type="button" className="reply-preview" onClick={() => onJump(ref.id)} title="Zur Nachricht springen">
       <Reply size={14} className="reply-icon" />
-      <span className="reply-author">{displayName(ref.author)}</span>
+      <span className="reply-author">{ref.webhook_name ?? displayName(ref.author)}</span>
       <span className="reply-text truncate">{text}</span>
     </button>
   )
@@ -514,7 +531,11 @@ const MessageItem = memo(function MessageItem({
 }) {
   const toggleReaction = useStore((s) => s.toggleReaction)
   const openProfile = useStore((s) => s.openProfile)
-  const authorName = useMemberName(message.community_id, message.author)
+  const memberName = useMemberName(message.community_id, message.author)
+  const webhook = message.webhook ?? null
+  // Webhooks zeigen ihren eigenen Namen und Avatar (nie eine fremde Bild-URL).
+  const authorName = webhook ? webhook.name : memberName
+  const avatarUser = webhook ? { id: message.webhook_id ?? webhook.name, avatar_url: webhook.avatar_url } : message.author
   const [editing, setEditing] = useState(false)
   const [picker, setPicker] = useState(false)
   const [lightbox, setLightbox] = useState<Attachment | null>(null)
@@ -577,12 +598,17 @@ const MessageItem = memo(function MessageItem({
             message.author && openProfile(message.author.id, message.community_id, e.currentTarget.getBoundingClientRect())
           }
         >
-          <Avatar user={message.author} name={authorName} size={40} />
+          <Avatar user={avatarUser} name={authorName} size={40} />
         </button>
       )}
       {!grouped && (
         <header className="message-header">
-          {message.author ? (
+          {webhook ? (
+            <>
+              <span className="message-author webhook">{authorName}</span>
+              <BotTag kind="webhook" />
+            </>
+          ) : message.author ? (
             <button
               type="button"
               className="message-author"
@@ -597,6 +623,7 @@ const MessageItem = memo(function MessageItem({
           ) : (
             <span className="message-author deleted">{authorName}</span>
           )}
+          {message.author?.bot && <BotTag />}
           <time className="message-time" dateTime={message.created_at}>
             {formatTimestamp(message.created_at)}
           </time>
@@ -626,6 +653,7 @@ const MessageItem = memo(function MessageItem({
           )}
         </div>
       )}
+      <EmbedList embeds={message.embeds} markdown={markdown} />
       <AttachmentList attachments={message.attachments} />
       <ReactionBar message={message} canReact={canReact} />
       {error && <p className="error small">{error}</p>}
@@ -904,7 +932,7 @@ function Composer({
         <div className="reply-bar">
           <Reply size={14} />
           <span className="truncate">
-            Antwort an <strong>{displayName(replyTo.author)}</strong>
+            Antwort an <strong>{senderName(replyTo)}</strong>
           </span>
           <button type="button" className="icon-button small" title="Antwort abbrechen" onClick={onCancelReply}>
             <X size={14} />

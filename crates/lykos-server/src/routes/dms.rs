@@ -5,6 +5,10 @@
 //! Eine DM eröffnen kann man mit Freunden und mit Nutzern, die mindestens eine Community mit einem teilen
 //! und DMs erlauben (`users.allow_dms`) – Schutz vor Spam und vor dem Ausforschen fremder Konten.
 //! Blockiert einer den anderen (`relationships`), geht das nie.
+//!
+//! Jeder Teilnehmer kann Unterhaltungen für sich anpinnen (`dm_recipients.pinned_at`, höchstens `MAX_PINS`) und
+//! Leute hinzufügen: In einer Gruppe kommen sie dazu (bis `MAX_GROUP_SIZE`), aus einer 1:1-DM entsteht dabei eine
+//! neue Gruppe (die 1:1-DM bleibt bestehen).
 
 use std::collections::HashMap;
 
@@ -16,6 +20,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgExecutor;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::{
@@ -23,7 +28,7 @@ use crate::{
     error::{ApiError, ApiResult, is_unique_violation},
     events::{Control, Scope},
     models::{UserPublic, double_option},
-    routes::calls,
+    routes::{calls, messages},
     state::AppState,
     voice,
 };
@@ -31,6 +36,8 @@ use crate::{
 /// Höchstzahl an Teilnehmern einer Gruppen-DM (inkl. Ersteller).
 pub const MAX_GROUP_SIZE: usize = 10;
 const MAX_NAME_CHARS: usize = 100;
+/// Höchstzahl angepinnter Unterhaltungen pro Nutzer.
+pub const MAX_PINS: i64 = 20;
 
 /// DM-Kanal aus Sicht eines Nutzers.
 #[derive(Debug, Clone, Serialize)]
@@ -47,6 +54,20 @@ pub struct DmChannel {
     pub last_read_message_id: Option<Uuid>,
     /// Ungelesene Nachrichten, die einen erwähnen. In Gateway-Events immer `0`.
     pub mention_count: i64,
+    /// Seit wann man die Unterhaltung angepinnt hat (eigene Sicht); `null` = nicht angepinnt. In Gateway-Events
+    /// immer `null` – Clients behalten ihren Stand (Änderungen kommen als `DM_PIN_UPDATE`).
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub pinned_at: Option<OffsetDateTime>,
+}
+
+impl DmChannel {
+    /// Fassung für geteilte Gateway-Events: ohne die eigene Sicht (Lesestand, Erwähnungen, Pin).
+    fn shared(mut self) -> Self {
+        self.last_read_message_id = None;
+        self.mention_count = 0;
+        self.pinned_at = None;
+        self
+    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -57,6 +78,7 @@ struct DmRow {
     last_message_id: Option<Uuid>,
     last_read_message_id: Option<Uuid>,
     mention_count: i64,
+    pinned_at: Option<OffsetDateTime>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -82,7 +104,8 @@ async fn load_dms(state: &AppState, user_id: Uuid, only: Option<Uuid>) -> ApiRes
                    AND mm.message_id > COALESCE(rs.last_read_message_id,
                                                 '00000000-0000-0000-0000-000000000000')
                    AND m.channel_id = c.id
-                   AND m.author_id IS DISTINCT FROM r.user_id) AS mention_count
+                   AND m.author_id IS DISTINCT FROM r.user_id) AS mention_count,
+                r.pinned_at
          FROM dm_recipients r
          JOIN channels c ON c.id = r.channel_id
          LEFT JOIN read_states rs ON rs.channel_id = c.id AND rs.user_id = r.user_id
@@ -122,6 +145,7 @@ async fn load_dms(state: &AppState, user_id: Uuid, only: Option<Uuid>) -> ApiRes
             last_message_id: r.last_message_id,
             last_read_message_id: r.last_read_message_id,
             mention_count: r.mention_count,
+            pinned_at: r.pinned_at,
         })
         .collect();
     // Neueste Aktivität zuerst (UUIDv7: Nachricht bzw. Kanal-Erstellung).
@@ -179,9 +203,13 @@ pub async fn contacts(State(state): State<AppState>, user: AuthUser) -> ApiResul
 
 #[derive(Deserialize)]
 pub struct CreateBody {
+    #[serde(default)]
     recipient_ids: Vec<Uuid>,
     /// Nur für Gruppen-DMs.
     name: Option<String>,
+    /// Immer eine neue Gruppe anlegen – auch mit nur einer weiteren Person oder ganz allein.
+    #[serde(default)]
+    group: bool,
 }
 
 fn normalize_name(name: Option<String>) -> ApiResult<String> {
@@ -227,15 +255,14 @@ async fn announce_new(state: &AppState, channel_id: Uuid, recipients: &[Uuid]) -
     for &uid in recipients {
         state.events.control(Scope::User(uid), Control::DmJoined { user_id: uid, channel_id });
     }
-    let mut dm = load_dm(state, recipients[0], channel_id).await?;
-    dm.last_read_message_id = None;
-    dm.mention_count = 0;
+    let dm = load_dm(state, recipients[0], channel_id).await?.shared();
     state.events.publish(Scope::Dm(channel_id), "DM_CREATE", &dm);
     Ok(())
 }
 
 /// `POST /dms` – DM eröffnen. Bei genau einem Empfänger wird eine bestehende 1:1-DM wiederverwendet
-/// (200), sonst entsteht ein neuer Kanal (201).
+/// (200), sonst entsteht ein neuer Kanal (201). Mit `group: true` entsteht immer eine neue Gruppe (auch mit
+/// einem oder keinem Empfänger).
 pub async fn create(
     State(state): State<AppState>,
     user: AuthUser,
@@ -245,16 +272,16 @@ pub async fn create(
     let mut others = body.recipient_ids;
     others.sort_unstable();
     others.dedup();
-    if others.is_empty() || others.contains(&user.user_id) {
+    if (others.is_empty() && !body.group) || others.contains(&user.user_id) {
         return Err(ApiError::BadRequest("invalid_request"));
     }
     if others.len() + 1 > MAX_GROUP_SIZE {
         return Err(ApiError::BadRequest("too_many_recipients"));
     }
-    let mut participants = others.clone();
-    participants.push(user.user_id);
 
-    if let [other] = others[..] {
+    if let ([other], false) = (&others[..], body.group) {
+        let other = *other;
+        let participants = [other, user.user_id];
         if body.name.as_deref().is_some_and(|n| !n.trim().is_empty()) {
             return Err(ApiError::BadRequest("invalid_request"));
         }
@@ -297,17 +324,209 @@ pub async fn create(
 
     let name = normalize_name(body.name)?;
     check_reachable(&state, user.user_id, &others).await?;
+    let id = create_group(&state, user.user_id, &others, &name).await?;
+    Ok((StatusCode::CREATED, Json(load_dm(&state, user.user_id, id).await?)))
+}
+
+/// Neue Gruppen-DM aus `creator` und `others` anlegen und ankündigen (Erreichbarkeit prüft der Aufrufer).
+async fn create_group(state: &AppState, creator: Uuid, others: &[Uuid], name: &str) -> ApiResult<Uuid> {
+    let mut participants = others.to_vec();
+    participants.push(creator);
     let id = Uuid::now_v7();
     let mut tx = state.db.begin().await?;
     sqlx::query("INSERT INTO channels (id, community_id, name, kind) VALUES ($1, NULL, $2, 'group_dm')")
         .bind(id)
-        .bind(&name)
+        .bind(name)
         .execute(&mut *tx)
         .await?;
     add_recipients(&mut tx, id, &participants).await?;
     tx.commit().await?;
-    announce_new(&state, id, &participants).await?;
-    Ok((StatusCode::CREATED, Json(load_dm(&state, user.user_id, id).await?)))
+    announce_new(state, id, &participants).await?;
+    Ok(id)
+}
+
+#[derive(Deserialize)]
+pub struct AddRecipientsBody {
+    recipient_ids: Vec<Uuid>,
+}
+
+/// Besteht zwischen `user_id` und einem der `others` eine Blockade (egal in welche Richtung) oder ist eines der
+/// Konten gesperrt? Dann `dm_not_allowed` – wie bei `check_reachable` nicht unterscheidbar.
+async fn check_not_blocked(state: &AppState, user_id: Uuid, others: &[Uuid]) -> ApiResult<()> {
+    let blocked: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1 FROM users u WHERE u.id = ANY($2) AND (
+                u.disabled_at IS NOT NULL
+                OR EXISTS (SELECT 1 FROM relationships b WHERE b.kind = 'blocked'
+                           AND ((b.user_id = $1 AND b.target_id = u.id) OR (b.user_id = u.id AND b.target_id = $1)))))",
+    )
+    .bind(user_id)
+    .bind(others)
+    .fetch_one(&state.db)
+    .await?;
+    if blocked { Err(ApiError::Forbidden("dm_not_allowed")) } else { Ok(()) }
+}
+
+/// `POST /dms/{id}/recipients` – Leute zu einer Unterhaltung hinzufügen. Jeder Teilnehmer darf das; die Neuen
+/// müssen für ihn erreichbar sein (wie beim Eröffnen einer DM).
+///
+/// - **Gruppe:** Die Neuen kommen dazu (200, aktualisierte Gruppe). Sie bekommen `DM_CREATE`, alle anderen
+///   `DM_UPDATE`, im Verlauf erscheint die Systemnachricht `recipient_add`. Ein laufender Anruf läuft weiter.
+/// - **1:1-DM:** Es entsteht eine neue Gruppe aus beiden und den Neuen (201, neue Gruppe); die 1:1-DM bleibt.
+pub async fn add(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(channel_id): Path<Uuid>,
+    Json(body): Json<AddRecipientsBody>,
+) -> ApiResult<(StatusCode, Json<DmChannel>)> {
+    let kind = own_dm_kind(&state, user.user_id, channel_id).await?;
+    state.rate_limit.dm_open(user.user_id)?;
+    let mut new = body.recipient_ids;
+    new.sort_unstable();
+    new.dedup();
+    if new.contains(&user.user_id) {
+        return Err(ApiError::BadRequest("invalid_request"));
+    }
+    let current = recipient_ids(&state.db, channel_id).await?;
+    new.retain(|u| !current.contains(u));
+    if new.is_empty() {
+        return Err(ApiError::BadRequest("invalid_request"));
+    }
+    if current.len() + new.len() > MAX_GROUP_SIZE {
+        return Err(ApiError::BadRequest("too_many_recipients"));
+    }
+    check_reachable(&state, user.user_id, &new).await?;
+
+    if kind == "dm" {
+        // Das Gegenüber (fehlt, wenn sein Konto gelöscht ist) kommt mit in die neue Gruppe.
+        let partner: Vec<Uuid> = current.into_iter().filter(|&u| u != user.user_id).collect();
+        check_not_blocked(&state, user.user_id, &partner).await?;
+        let mut others = partner;
+        others.extend(&new);
+        let id = create_group(&state, user.user_id, &others, "").await?;
+        return Ok((StatusCode::CREATED, Json(load_dm(&state, user.user_id, id).await?)));
+    }
+
+    let mut tx = state.db.begin().await?;
+    // Gleichzeitiges Hinzufügen/Verlassen nacheinander, damit das Limit hält.
+    sqlx::query("SELECT id FROM channels WHERE id = $1 FOR UPDATE")
+        .bind(channel_id)
+        .execute(&mut *tx)
+        .await?;
+    let current = recipient_ids(&mut *tx, channel_id).await?;
+    if !current.contains(&user.user_id) {
+        return Err(ApiError::not_found());
+    }
+    new.retain(|u| !current.contains(u));
+    if current.len() + new.len() > MAX_GROUP_SIZE {
+        return Err(ApiError::BadRequest("too_many_recipients"));
+    }
+    if new.is_empty() {
+        drop(tx);
+        return Ok((StatusCode::OK, Json(load_dm(&state, user.user_id, channel_id).await?)));
+    }
+    add_recipients(&mut tx, channel_id, &new).await?;
+    // Systemnachricht „X hat Y hinzugefügt“: die Neuen als Erwähnungen.
+    let message_id = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO messages (id, channel_id, author_id, content, kind) VALUES ($1, $2, $3, '', 'recipient_add')",
+    )
+    .bind(message_id)
+    .bind(channel_id)
+    .bind(user.user_id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("INSERT INTO message_mentions (message_id, user_id) SELECT $1, unnest($2::uuid[])")
+        .bind(message_id)
+        .bind(&new)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    // Reihenfolge zählt: Erst die bisherigen Teilnehmer (`DM_UPDATE` geht nur an bestehende Abos), dann die Neuen
+    // abonnieren lassen und ihnen die Gruppe schicken – so bekommt jeder genau ein DM-Event.
+    announce_update(&state, channel_id).await?;
+    let dm = load_dm(&state, user.user_id, channel_id).await?;
+    let shared = dm.clone().shared();
+    for &uid in &new {
+        state.events.control(Scope::User(uid), Control::DmJoined { user_id: uid, channel_id });
+        state.events.publish(Scope::User(uid), "DM_CREATE", &shared);
+    }
+    messages::broadcast(&state, "MESSAGE_CREATE", message_id).await?;
+    calls::sync_new_recipients(&state, channel_id, &new).await?;
+    Ok((StatusCode::OK, Json(dm)))
+}
+
+/// `DM_PIN_UPDATE` – nur an die eigenen Verbindungen.
+#[derive(Serialize)]
+struct PinUpdate {
+    channel_id: Uuid,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pinned_at: Option<OffsetDateTime>,
+}
+
+/// `PUT /dms/{id}/pin` – Unterhaltung für sich anpinnen (höchstens `MAX_PINS`). Schon angepinnte behalten ihren
+/// Zeitpunkt.
+pub async fn pin(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(channel_id): Path<Uuid>,
+) -> ApiResult<Json<DmChannel>> {
+    own_dm_kind(&state, user.user_id, channel_id).await?;
+    let mut tx = state.db.begin().await?;
+    // Eigene Zeilen sperren: parallele Pins zählen nacheinander.
+    let pinned: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM (SELECT pinned_at FROM dm_recipients WHERE user_id = $1 FOR UPDATE) r
+         WHERE r.pinned_at IS NOT NULL",
+    )
+    .bind(user.user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    let changed: Option<OffsetDateTime> = sqlx::query_scalar(
+        "UPDATE dm_recipients SET pinned_at = now()
+         WHERE channel_id = $1 AND user_id = $2 AND pinned_at IS NULL RETURNING pinned_at",
+    )
+    .bind(channel_id)
+    .bind(user.user_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if changed.is_some() && pinned >= MAX_PINS {
+        return Err(ApiError::BadRequest("too_many_dm_pins"));
+    }
+    tx.commit().await?;
+    if changed.is_some() {
+        state.events.publish(
+            Scope::User(user.user_id),
+            "DM_PIN_UPDATE",
+            PinUpdate { channel_id, pinned_at: changed },
+        );
+    }
+    Ok(Json(load_dm(&state, user.user_id, channel_id).await?))
+}
+
+/// `DELETE /dms/{id}/pin` – Pin lösen (auch wenn nicht angepinnt: 204).
+pub async fn unpin(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(channel_id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
+    own_dm_kind(&state, user.user_id, channel_id).await?;
+    let changed = sqlx::query(
+        "UPDATE dm_recipients SET pinned_at = NULL WHERE channel_id = $1 AND user_id = $2 AND pinned_at IS NOT NULL",
+    )
+    .bind(channel_id)
+    .bind(user.user_id)
+    .execute(&state.db)
+    .await?
+    .rows_affected();
+    if changed > 0 {
+        state.events.publish(
+            Scope::User(user.user_id),
+            "DM_PIN_UPDATE",
+            PinUpdate { channel_id, pinned_at: None },
+        );
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn add_recipients(
@@ -361,10 +580,7 @@ pub async fn update(
             .await?;
     }
     let dm = load_dm(&state, user.user_id, channel_id).await?;
-    let mut event = dm.clone();
-    event.last_read_message_id = None;
-    event.mention_count = 0;
-    state.events.publish(Scope::Dm(channel_id), "DM_UPDATE", &event);
+    state.events.publish(Scope::Dm(channel_id), "DM_UPDATE", dm.clone().shared());
     Ok(Json(dm))
 }
 
@@ -413,9 +629,7 @@ pub async fn announce_update(state: &AppState, channel_id: Uuid) -> ApiResult<()
     let Some(&someone) = recipient_ids(&state.db, channel_id).await?.first() else {
         return Ok(());
     };
-    let mut dm = load_dm(state, someone, channel_id).await?;
-    dm.last_read_message_id = None;
-    dm.mention_count = 0;
+    let dm = load_dm(state, someone, channel_id).await?.shared();
     state.events.publish(Scope::Dm(channel_id), "DM_UPDATE", &dm);
     Ok(())
 }

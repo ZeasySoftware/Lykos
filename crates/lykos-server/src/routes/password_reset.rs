@@ -74,7 +74,7 @@ pub async fn complete(
     let token_hash = auth::token_hash(body.token.trim());
     // Vorab prüfen, damit ungültige Links kein teures Hashing auslösen.
     let known: Option<bool> = sqlx::query_scalar(concat!(
-        "SELECT u.disabled_at IS NOT NULL FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
+        "SELECT u.disabled_at IS NOT NULL OR u.is_bot FROM password_reset_tokens t JOIN users u ON u.id = t.user_id
          WHERE t.token_hash = $1 AND ",
         valid!()
     ))
@@ -83,7 +83,7 @@ pub async fn complete(
     .await?;
     match known {
         None => return Err(ApiError::NotFound("invalid_reset_token")),
-        // Gesperrte Konten können ihr Passwort nicht selbst zurücksetzen.
+        // Gesperrte Konten (und Bots, die kein Passwort haben) können ihr Passwort nicht selbst zurücksetzen.
         Some(true) => return Err(ApiError::Forbidden("account_disabled")),
         Some(false) => {}
     }

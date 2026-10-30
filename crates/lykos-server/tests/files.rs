@@ -257,7 +257,8 @@ async fn message_with_attachments(db: PgPool) {
     // Liste lädt Anhänge mit (und Nachrichten ohne Anhang haben eine leere Liste).
     f.send_message(&bob, ch, json!({ "content": "schön!" })).await;
     let (_, page) = f.app.call("GET", &format!("/channels/{ch}/messages"), Some(&bob), None).await;
-    let page = page.as_array().unwrap();
+    // Ohne die Beitrittsmeldung im Systemkanal.
+    let page: Vec<&Value> = page.as_array().unwrap().iter().filter(|m| m["kind"] == "default").collect();
     assert_eq!(page.len(), 2);
     assert_eq!(page[0]["attachments"], json!([]));
     assert_eq!(page[1]["attachments"].as_array().unwrap().len(), 2);

@@ -10,7 +10,7 @@ import { tileKey } from '../lib/callLayout'
 import { useVoice } from '../lib/voice'
 import { displayName, memberName, useMember, useStore } from '../store'
 import { Avatar } from './Presence'
-import { HeadphoneOff, MicOff, Settings, Volume2, VolumeX } from 'lucide-react'
+import { HeadphoneOff, MicOff, Moon, Settings, Volume2, VolumeX } from 'lucide-react'
 
 const EMPTY: VoiceState[] = []
 /** Communities, deren Mitgliederliste gerade für Voice-Namen geladen wird. */
@@ -41,6 +41,7 @@ export function VoiceChannel({
   const canConnect = has(perms, Permission.CONNECT)
   const participants = states.filter((v) => v.channel_id === channel.id)
   const connected = connectedChannel === channel.id
+  const isAfk = detail.community.afk_channel_id === channel.id
 
   // Namen der Teilnehmer kommen aus der Mitgliederliste – ggf. nachladen.
   const hasMembers = useStore((s) => !!s.members[channel.community_id])
@@ -58,6 +59,7 @@ export function VoiceChannel({
   let title = channel.topic ?? channel.name
   if (!voiceEnabled) title = 'Sprachkanäle sind auf dieser Instanz nicht eingerichtet.'
   else if (!canConnect) title = 'Dir fehlt die Berechtigung, diesem Sprachkanal beizutreten.'
+  else if (isAfk) title = `${title} – AFK-Kanal: hier hört man nur zu.`
 
   // Wie bei Discord: Klick zeigt die Call-Bühne und tritt bei, solange man in keinem anderen Call ist
   // (aus einem laufenden Call wechselt erst „Beitreten“ in der Vorschau – kein versehentlicher Wechsel).
@@ -81,6 +83,11 @@ export function VoiceChannel({
             <Volume2 size={18} />
           </span>
           <span className="truncate">{channel.name}</span>
+          {isAfk && (
+            <span className="channel-afk" aria-label="AFK-Kanal">
+              <Moon size={13} aria-hidden="true" />
+            </span>
+          )}
         </button>
         {onSettings && (
           <button type="button" className="channel-settings icon-button small" title="Kanal bearbeiten" onClick={onSettings}>

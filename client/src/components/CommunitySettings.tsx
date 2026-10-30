@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DragEvent, FormEvent } from 'react'
 import { endpoints } from '../lib/api'
-import type { CommunityDetail, Invite, Member, Role, StorageUsage } from '../lib/api'
+import type { Bot as BotAccount, CommunityDetail, Invite, Member, Role, StorageUsage } from '../lib/api'
 import { leaveCommunity } from '../lib/contextMenus'
 import type { CommunityTab } from '../lib/dialogs'
 import { confirmAction, openDialog } from '../lib/dialogs'
+import { AFK_TIMEOUTS, afkTimeout, afkTimeoutLabel } from '../lib/afk'
 import { errorText } from '../lib/errors'
-import { communityTabs } from '../lib/menuRules'
+import { communityTabs, targetBelowMe } from '../lib/menuRules'
 import { PERMISSIONS, PERMISSION_GROUPS, ROLE_COLOR_SUGGESTIONS, covers, roleColor } from '../lib/permissionLabels'
 import { Permission, has } from '../lib/permissions'
 import { outranks, sortRoles, topPosition } from '../lib/roles'
@@ -14,6 +15,8 @@ import { runAction } from '../lib/toast'
 import { useUnsavedChanges, useUnsavedGuard } from '../lib/unsaved'
 import { displayName, memberName, useStore } from '../store'
 import { AuditTab } from './AuditLog'
+import { AutoModPage } from './AutoModSettings'
+import { BansPage } from './Bans'
 import { EmojiInput } from './EmojiButton'
 import { EmojiManager } from './EmojiManager'
 import { CommunityAppearance } from './customize/CommunityAppearance'
@@ -22,7 +25,7 @@ import { SettingsLayer, SettingsPage, SettingsSection } from './SettingsLayer'
 import type { SettingsGroup } from './SettingsLayer'
 import { UsageBar } from './StorageUsage'
 import { SwitchRow } from './Switch'
-import { Ban, Check, ChevronDown, ChevronUp, Crown, GripVertical, LogOut, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { Ban, Bot, Check, ChevronDown, ChevronUp, Crown, GripVertical, LogOut, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 
 type Section = CommunityTab | 'leave'
 
@@ -90,6 +93,7 @@ export function CommunitySettings({
       )}
       {current === 'roles' && <RolesPage detail={detail} />}
       {current === 'members' && <MembersPage detail={detail} />}
+      {current === 'bans' && <BansPage detail={detail} />}
       {current === 'invites' && <InvitesPage detail={detail} />}
       {current === 'emojis' && (
         <SettingsPage
@@ -99,6 +103,7 @@ export function CommunitySettings({
           <EmojiManager communityId={detail.community.id} canManage />
         </SettingsPage>
       )}
+      {current === 'automod' && <AutoModPage key={detail.community.id} detail={detail} />}
       {current === 'audit' && <AuditTab detail={detail} />}
       {current === 'danger' && isOwner && <DangerPage detail={detail} onDone={onClose} />}
     </SettingsLayer>
@@ -120,8 +125,13 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
     days: community.message_retention_days ?? 90,
     noQuota: community.upload_quota_mb == null,
     quotaGb: community.upload_quota_mb != null ? community.upload_quota_mb / 1024 : 10,
+    afkChannel: community.afk_channel_id ?? '',
+    afkTimeout: afkTimeout(community.afk_timeout_seconds),
   }
+  const voiceChannels = detail.channels.filter((c) => c.kind === 'voice').sort((a, b) => a.position - b.position)
   const [name, setName] = useState(initial.name)
+  const [afkChannel, setAfkChannel] = useState(initial.afkChannel)
+  const [afkSeconds, setAfkSeconds] = useState(initial.afkTimeout)
   const [unlimited, setUnlimited] = useState(initial.unlimited)
   const [days, setDays] = useState(initial.days)
   const [noQuota, setNoQuota] = useState(initial.noQuota)
@@ -145,7 +155,9 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
       unlimited !== initial.unlimited ||
       (!unlimited && days !== initial.days) ||
       noQuota !== initial.noQuota ||
-      (!noQuota && quotaGb !== initial.quotaGb))
+      (!noQuota && quotaGb !== initial.quotaGb) ||
+      afkChannel !== initial.afkChannel ||
+      afkSeconds !== initial.afkTimeout)
 
   async function save() {
     if (!name.trim()) {
@@ -159,11 +171,15 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
         name: name.trim(),
         message_retention_days: unlimited ? null : Math.min(3650, Math.max(1, Math.floor(days))),
         upload_quota_mb: noQuota ? null : Math.min(10_000_000, Math.max(1, Math.round(quotaGb * 1024))),
+        afk_channel_id: afkChannel || null,
+        afk_timeout_seconds: afkSeconds,
       })
       updateCommunity(updated)
       setName(updated.name)
       setDays(updated.message_retention_days ?? 90)
       setQuotaGb(updated.upload_quota_mb != null ? updated.upload_quota_mb / 1024 : 10)
+      setAfkChannel(updated.afk_channel_id ?? '')
+      setAfkSeconds(afkTimeout(updated.afk_timeout_seconds))
     } catch (err) {
       setError(errorText(err))
     } finally {
@@ -177,6 +193,8 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
     setDays(initial.days)
     setNoQuota(initial.noQuota)
     setQuotaGb(initial.quotaGb)
+    setAfkChannel(initial.afkChannel)
+    setAfkSeconds(initial.afkTimeout)
     setError(null)
   }
 
@@ -186,6 +204,10 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
     community.message_retention_days == null
       ? 'Nachrichten werden unbegrenzt aufbewahrt.'
       : `Nachrichten werden nach ${community.message_retention_days} Tagen gelöscht.`
+  const afkName = voiceChannels.find((c) => c.id === community.afk_channel_id)?.name
+  const afkInfo = afkName
+    ? `Wer ${afkTimeoutLabel(community.afk_timeout_seconds)} lang weder spricht noch die App bedient, wechselt in „${afkName}“.`
+    : 'Kein AFK-Kanal eingestellt.'
 
   if (!canManage) {
     return (
@@ -195,6 +217,9 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
         </SettingsSection>
         <SettingsSection title="Aufbewahrung">
           <p className="muted">{retention}</p>
+        </SettingsSection>
+        <SettingsSection title="AFK-Kanal">
+          <p className="muted">{afkInfo}</p>
         </SettingsSection>
         <p className="muted small">Angelegt am {dateFmt.format(new Date(community.created_at))}.</p>
       </SettingsPage>
@@ -233,6 +258,34 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
           </label>
         )}
         {usage && <UsageBar usage={usage} />}
+      </SettingsSection>
+      <SettingsSection
+        title="AFK-Kanal"
+        description="Wer im Sprachkanal so lange weder spricht noch die App bedient, wechselt automatisch hierher – außer beim Streamen oder mit Kamera. Im AFK-Kanal kann niemand sprechen, streamen oder die Kamera nutzen."
+      >
+        <div className="afk-settings">
+          <label className="field">
+            <span>Kanal</span>
+            <select value={afkChannel} onChange={(e) => setAfkChannel(e.target.value)}>
+              <option value="">Kein AFK-Kanal</option>
+              {voiceChannels.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Inaktiv nach</span>
+            <select value={afkSeconds} disabled={!afkChannel} onChange={(e) => setAfkSeconds(Number(e.target.value))}>
+              {AFK_TIMEOUTS.map((t) => (
+                <option key={t.seconds} value={t.seconds}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </SettingsSection>
       {error && <p className="error">{error}</p>}
       <p className="muted small">Angelegt am {dateFmt.format(new Date(community.created_at))}.</p>
@@ -825,6 +878,7 @@ function MembersPage({ detail }: { detail: CommunityDetail }) {
   const members = useStore((s) => s.members[communityId])
   const loadMembers = useStore((s) => s.loadMembers)
   const me = useStore((s) => s.user)
+  const allowBots = useStore((s) => s.instance?.allow_bots ?? false)
   const [filter, setFilter] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -835,12 +889,24 @@ function MembersPage({ detail }: { detail: CommunityDetail }) {
 
   const canRoles = has(detail.permissions, Permission.MANAGE_ROLES)
   const canKick = has(detail.permissions, Permission.KICK_MEMBERS)
+  const canBan = has(detail.permissions, Permission.BAN_MEMBERS)
   const canNicks = has(detail.permissions, Permission.MANAGE_NICKNAMES)
   const canOwnNick = canNicks || has(detail.permissions, Permission.CHANGE_NICKNAME)
   const assignable = sortRoles(detail.roles).filter((r) => !r.is_default)
   const roles = new Map(detail.roles.map((r) => [r.id, r]))
   const iAmOwner = detail.community.owner_id === me?.id
   const top = topPosition(detail.roles, members?.find((m) => m.user.id === me?.id)?.role_ids)
+  /** Rollenhierarchie wie auf dem Server: Bannen nur unterhalb der eigenen höchsten Rolle. */
+  const belowMe = (m: Member) =>
+    targetBelowMe({
+      myPerms: detail.permissions,
+      iAmOwner,
+      myRoleIds: members?.find((x) => x.user.id === me?.id)?.role_ids,
+      isSelf: false,
+      targetIsOwner: m.user.id === detail.community.owner_id,
+      targetRoleIds: m.role_ids,
+      roles: detail.roles,
+    })
 
   const q = filter.trim().toLowerCase()
   const list = (members ?? [])
@@ -878,6 +944,9 @@ function MembersPage({ detail }: { detail: CommunityDetail }) {
 
   return (
     <SettingsPage title={`Mitglieder${members ? ` – ${members.length}` : ''}`}>
+      {allowBots && has(detail.permissions, Permission.MANAGE_COMMUNITY) && (
+        <AddBot communityId={communityId} memberIds={new Set((members ?? []).map((m) => m.user.id))} />
+      )}
       <label className="search-input">
         <Search size={15} aria-hidden="true" />
         <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Mitglieder suchen" aria-label="Mitglieder suchen" />
@@ -937,6 +1006,17 @@ function MembersPage({ detail }: { detail: CommunityDetail }) {
                       Entfernen
                     </button>
                   )}
+                  {canBan && !isOwner && m.user.id !== me?.id && belowMe(m) && (
+                    <button
+                      type="button"
+                      className="button danger small-button"
+                      onClick={() =>
+                        openDialog({ kind: 'ban', communityId, userId: m.user.id, name: memberName(m) })
+                      }
+                    >
+                      Bannen
+                    </button>
+                  )}
                 </div>
               </div>
               {open && (
@@ -967,6 +1047,70 @@ function MembersPage({ detail }: { detail: CommunityDetail }) {
         })}
       </ul>
     </SettingsPage>
+  )
+}
+
+/** Bot hinzufügen (`MANAGE_COMMUNITY`): eigener Bot aus der Liste oder ein öffentlicher per ID. */
+function AddBot({ communityId, memberIds }: { communityId: string; memberIds: Set<string> }) {
+  const loadMembers = useStore((s) => s.loadMembers)
+  const [own, setOwn] = useState<BotAccount[]>([])
+  const [botId, setBotId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<Feedback>(null)
+
+  useEffect(() => {
+    endpoints.bots().then(setOwn, () => setOwn([]))
+  }, [])
+
+  const candidates = own.filter((b) => !memberIds.has(b.id))
+
+  async function add(e: FormEvent) {
+    e.preventDefault()
+    const id = botId.trim()
+    if (!id) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const member = await endpoints.addBotToCommunity(communityId, id)
+      await loadMembers(communityId)
+      setBotId('')
+      setMsg({ ok: true, text: `${displayName(member.user)} wurde hinzugefügt.` })
+    } catch (err) {
+      setMsg({ ok: false, text: errorText(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <SettingsSection
+      title="Bot hinzufügen"
+      description="Eigene Bots legst du unter Einstellungen → Entwickler an. Fremde Bots gehen per ID, wenn ihr Besitzer sie öffentlich gemacht hat."
+    >
+      <form className="integration-form" onSubmit={(e) => void add(e)}>
+        {candidates.length > 0 && (
+          <label className="field">
+            <span>Eigener Bot</span>
+            <select value={candidates.some((b) => b.id === botId) ? botId : ''} onChange={(e) => setBotId(e.target.value)}>
+              <option value="">– auswählen –</option>
+              {candidates.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {displayName(b)} (@{b.username})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="field">
+          <span>Bot-ID</span>
+          <input value={botId} onChange={(e) => setBotId(e.target.value)} placeholder="z. B. 0192f3a0-…" spellCheck={false} />
+        </label>
+        <button type="submit" className="button primary" disabled={busy || !botId.trim()}>
+          <Bot size={16} aria-hidden="true" /> Hinzufügen
+        </button>
+      </form>
+      {msg && <p className={msg.ok ? 'success' : 'error'}>{msg.text}</p>}
+    </SettingsSection>
   )
 }
 

@@ -98,6 +98,8 @@ export interface AdminSettings {
   user_quota_mb: number | null
   allow_community_creation: boolean
   announcement: string | null
+  /** Bot-Konten erlaubt (ältere Server liefern das Feld nicht). */
+  allow_bots?: boolean
   defaults: { instance_name: string; max_upload_mb: number; user_quota_mb: number | null }
   overridden: string[]
 }
@@ -111,6 +113,7 @@ export interface AdminSettingsPatch {
   user_quota_mb?: number | null
   allow_community_creation?: boolean | null
   announcement?: string | null
+  allow_bots?: boolean | null
 }
 
 export type OwnedCommunities = 'transfer' | 'delete'

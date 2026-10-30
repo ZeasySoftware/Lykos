@@ -324,10 +324,20 @@ async fn join_message_in_system_channel(db: PgPool) {
     let (alex, _bob, _carol, rudel) = setup(&f.app).await;
     let messages_path = format!("/channels/{}/messages", rudel.text_channel);
 
-    // Ohne Systemkanal: keine Meldung.
+    // Ohne Systemkanal: keine Meldung (neue Communities nutzen den ersten Textkanal – hier entfernt).
+    f.app
+        .call(
+            "PATCH",
+            &format!("/communities/{}", rudel.id),
+            Some(&alex),
+            Some(json!({ "system_channel_id": null })),
+        )
+        .await;
+    let (_, msgs) = f.app.call("GET", &messages_path, Some(&alex), None).await;
+    let before = msgs.as_array().unwrap().len();
     f.app.invited_user(&alex, &rudel, "dora").await;
     let (_, msgs) = f.app.call("GET", &messages_path, Some(&alex), None).await;
-    assert!(msgs.as_array().unwrap().is_empty(), "{msgs}");
+    assert_eq!(msgs.as_array().unwrap().len(), before, "{msgs}");
 
     f.app
         .call(
@@ -351,7 +361,7 @@ async fn join_message_in_system_channel(db: PgPool) {
 
     let (_, msgs) = f.app.call("GET", &messages_path, Some(&erik), None).await;
     let msgs = msgs.as_array().unwrap();
-    assert_eq!(msgs.len(), 2, "{msgs:?}");
+    assert_eq!(msgs.len(), before + 2, "{msgs:?}");
     assert!(msgs.iter().all(|m| m["kind"] == "member_join" && m["content"] == ""));
     assert_eq!(msgs[0]["author"]["username"], "fritz");
     assert_eq!(msgs[1]["author"]["id"], erik_id.as_str());

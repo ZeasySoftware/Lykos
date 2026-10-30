@@ -5,8 +5,11 @@ pub mod admin;
 pub mod attachments;
 pub mod audit;
 pub mod auth;
+pub mod automod;
 pub mod config;
 pub mod desktop;
+pub mod discord_template;
+pub mod embeds;
 pub mod emojis;
 pub mod error;
 pub mod events;
@@ -70,6 +73,7 @@ pub fn try_state(db: PgPool, config: Config) -> Result<AppState> {
         desktop: Default::default(),
         mailer,
         oidc: Default::default(),
+        automod: Default::default(),
     })
 }
 
@@ -107,8 +111,35 @@ pub fn app(state: AppState) -> Result<Router> {
         .layer(cors)
         .layer(middleware::from_fn(static_cache_control))
         .layer(compression())
-        .layer(TraceLayer::new_for_http())
+        // Wie `TraceLayer::new_for_http()`, aber ohne Query und mit geschwärztem Webhook-Token im Pfad.
+        .layer(TraceLayer::new_for_http().make_span_with(|req: &Request| {
+            tracing::debug_span!(
+                "request",
+                method = %req.method(),
+                path = %redact_path(req.uri().path()),
+                version = ?req.version(),
+            )
+        }))
         .with_state(state))
+}
+
+/// Pfad fürs Log: Das Token in `/api/webhooks/{id}/{token}…` wird durch `***` ersetzt (Tokens landen nie
+/// im Log). Verwaltungs-Pfade (`…/avatar`, `…/token`) bleiben unverändert.
+pub fn redact_path(path: &str) -> std::borrow::Cow<'_, str> {
+    let Some(rest) = path.strip_prefix("/api/webhooks/") else {
+        return path.into();
+    };
+    let mut parts = rest.splitn(3, '/');
+    let (Some(id), Some(token)) = (parts.next(), parts.next()) else {
+        return path.into();
+    };
+    if matches!(token, "avatar" | "token" | "") {
+        return path.into();
+    }
+    match parts.next() {
+        Some(tail) => format!("/api/webhooks/{id}/***/{tail}").into(),
+        None => format!("/api/webhooks/{id}/***").into(),
+    }
 }
 
 /// gzip/brotli für API-Antworten und den Web-Client. Ausgenommen (neben Bildern, SSE und Winzlingen
@@ -157,4 +188,22 @@ fn cors(origins: &[String]) -> Result<CorsLayer> {
         .allow_origin(AllowOrigin::list(origins))
         .allow_methods(Any)
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_path;
+
+    #[test]
+    fn webhook_tokens_are_redacted_in_logs() {
+        assert_eq!(redact_path("/api/webhooks/abc/lykw_geheim"), "/api/webhooks/abc/***");
+        assert_eq!(
+            redact_path("/api/webhooks/abc/lykw_geheim/messages/m1"),
+            "/api/webhooks/abc/***/messages/m1"
+        );
+        assert_eq!(redact_path("/api/webhooks/abc/avatar/x"), "/api/webhooks/abc/avatar/x");
+        assert_eq!(redact_path("/api/webhooks/abc/token"), "/api/webhooks/abc/token");
+        assert_eq!(redact_path("/api/webhooks/abc"), "/api/webhooks/abc");
+        assert_eq!(redact_path("/api/messages/x"), "/api/messages/x");
+    }
 }
