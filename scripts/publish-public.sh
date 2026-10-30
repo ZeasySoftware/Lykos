@@ -6,11 +6,15 @@
 # Nutzung:
 #   scripts/publish-public.sh --dry-run [--ref <rev>]          # nur anzeigen und prüfen, nichts schreiben
 #   scripts/publish-public.sh [--ref <rev>] [--force] <ziel>   # Export nach <ziel> (darf nicht existieren/muss leer sein)
+#   scripts/publish-public.sh [--ref <rev>] --into <klon>      # Update: Stand als neuen Commit in einen Klon des
+#                                                              # öffentlichen Repos legen (Historie bleibt erhalten)
 #
 # Optionen:
 #   --dry-run    Export nur in ein temporäres Verzeichnis, Dateiliste + Prüfung ausgeben, danach löschen.
 #   --ref <rev>  Zu exportierender Stand (Standard: HEAD). Nur Committetes wird exportiert.
 #   --force      Treffer der Prüfung auf interne Angaben nicht als Fehler werten (nur bewusst verwenden).
+#   --into <dir> Sauberer Klon des öffentlichen Repos: Inhalt wird durch den Export ersetzt und als
+#                „Lykos <version>“ committet (Autor Zeasy Software <info@zeasy.software>). Nichts wird gepusht.
 #
 # Ausgelassen werden (siehe EXCLUDES): ops/ (Betrieb/Strategie), HANDOFF.md (Sitzungsnotizen), docs/handoff/.
 # Danach wird der Export nach internen Mustern durchsucht (LAN-IPs, CT-Nummern, Konten, …); gitleaks läuft
@@ -33,14 +37,19 @@ DRY_RUN=0
 FORCE=0
 REF=HEAD
 TARGET=''
+INTO=''
+# Öffentliche Identität für Commits im öffentlichen Repo (keine persönlichen Adressen).
+PUBLIC_NAME='Zeasy Software'
+PUBLIC_EMAIL='info@zeasy.software'
 
-usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --force) FORCE=1 ;;
     --ref) REF="${2:?--ref braucht einen Wert}"; shift ;;
+    --into) INTO="${2:?--into braucht einen Klon}"; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "Unbekannte Option: $1" >&2; usage >&2; exit 2 ;;
     *) [[ -z "$TARGET" ]] || { echo "Nur ein Zielverzeichnis erlaubt." >&2; exit 2; }; TARGET="$1" ;;
@@ -48,7 +57,12 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-if [[ $DRY_RUN -eq 0 && -z "$TARGET" ]]; then
+if [[ -n "$INTO" ]]; then
+  [[ -z "$TARGET" && $DRY_RUN -eq 0 ]] || { echo "--into nicht zusammen mit Ziel oder --dry-run." >&2; exit 2; }
+  git -C "$INTO" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "$INTO ist kein Git-Klon." >&2; exit 1; }
+  [[ -z "$(git -C "$INTO" status --porcelain)" ]] || { echo "$INTO hat uncommittete Änderungen." >&2; exit 1; }
+  INTO="$(cd "$INTO" && pwd)"
+elif [[ $DRY_RUN -eq 0 && -z "$TARGET" ]]; then
   echo "Zielverzeichnis fehlt (oder --dry-run verwenden)." >&2
   usage >&2
   exit 2
@@ -67,7 +81,7 @@ fi
 PATHSPECS=(.)
 for e in "${EXCLUDES[@]}"; do PATHSPECS+=(":(exclude)$e"); done
 
-if [[ $DRY_RUN -eq 1 ]]; then
+if [[ $DRY_RUN -eq 1 || -n "$INTO" ]]; then
   OUT="$(mktemp -d)"
   trap 'rm -rf "$OUT"' EXIT
 else
@@ -138,10 +152,34 @@ if [[ $DRY_RUN -eq 1 ]]; then
   exit 0
 fi
 
+if [[ -n "$INTO" ]]; then
+  echo "==> Übernehme Export als neuen Commit in $INTO"
+  # Alles Versionierte ersetzen (.git bleibt): Gelöschte Dateien verschwinden so auch öffentlich.
+  git -C "$INTO" rm -r -q --ignore-unmatch -- . >/dev/null
+  (cd "$OUT" && tar -cf - .) | tar -xf - -C "$INTO"
+  git -C "$INTO" add -A
+  if git -C "$INTO" diff --cached --quiet; then
+    echo "  keine Änderungen gegenüber dem öffentlichen Stand."
+    exit 0
+  fi
+  git -C "$INTO" diff --cached --stat | tail -n 1
+  git -C "$INTO" -c user.name="$PUBLIC_NAME" -c user.email="$PUBLIC_EMAIL" commit -q -m "Lykos $VERSION" \
+    -m "Quellstand: $SHORT (nicht öffentliche Historie)."
+  git -C "$INTO" log --oneline -1
+  cat <<EOF
+
+Fertig. Nichts wurde gepusht. Prüfen und veröffentlichen:
+  git -C "$INTO" show --stat
+  git -C "$INTO" push && git -C "$INTO" tag -a v$VERSION -m "Lykos $VERSION" && git -C "$INTO" push origin v$VERSION
+  (Tag mit öffentlicher Identität: git -c user.name="$PUBLIC_NAME" -c user.email="$PUBLIC_EMAIL" -C … tag …)
+EOF
+  exit 0
+fi
+
 echo "==> Neue Historie in $OUT"
 git -C "$OUT" init -q -b main
 git -C "$OUT" add -A
-git -C "$OUT" commit -q -m "Lykos $VERSION – erste öffentliche Version" \
+git -C "$OUT" -c user.name="$PUBLIC_NAME" -c user.email="$PUBLIC_EMAIL" commit -q -m "Lykos $VERSION – erste öffentliche Version" \
   -m "Quellstand: $SHORT (nicht öffentliche Historie)."
 git -C "$OUT" log --oneline -1
 
