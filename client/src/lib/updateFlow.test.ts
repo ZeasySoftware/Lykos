@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  updateCheckView,
   indicatorView,
   initialSplash,
   isStalled,
@@ -118,4 +119,36 @@ test('Hinweis in der Nutzerleiste', () => {
   assert.equal(indicatorView('installing', '0.3.2', false).actionable, false)
   assert.equal(indicatorView('error', '0.3.2', false).actionable, true)
   assert.equal(indicatorView('error', '0.3.2', true).actionable, false)
+})
+
+test('Einstellungen: Status neben „Nach Updates suchen“', () => {
+  const base = {
+    checking: false,
+    status: 'idle' as const,
+    version: null,
+    progress: null,
+    lastCheck: null,
+    installedVersion: '0.5.0',
+    inCall: false,
+  }
+  assert.deepEqual(updateCheckView(base), { text: '', tone: 'muted', canCheck: true, restart: 'hidden' })
+  assert.equal(updateCheckView({ ...base, checking: true }).text, 'Suche …')
+  assert.equal(updateCheckView({ ...base, checking: true }).canCheck, false)
+  assert.equal(updateCheckView({ ...base, lastCheck: 'current' }).text, 'Lykos ist aktuell (Version 0.5.0)')
+  assert.equal(updateCheckView({ ...base, lastCheck: 'failed' }).tone, 'warn')
+
+  const loading = updateCheckView({ ...base, status: 'downloading', version: '0.6.0', progress: 42 })
+  assert.equal(loading.text, 'Update 0.6.0 wird geladen … 42 %')
+  assert.equal(loading.canCheck, false)
+  assert.equal(updateCheckView({ ...base, status: 'downloading', version: '0.6.0' }).text, 'Update 0.6.0 wird geladen …')
+
+  const ready = updateCheckView({ ...base, status: 'ready', version: '0.6.0', lastCheck: 'ready' })
+  assert.equal(ready.text, 'Update 0.6.0 bereit')
+  assert.equal(ready.restart, 'enabled')
+  const inCall = updateCheckView({ ...base, status: 'ready', version: '0.6.0', inCall: true })
+  assert.equal(inCall.restart, 'blocked')
+  assert.equal(inCall.text, 'Update 0.6.0 bereit – Neustart nach dem Sprachanruf')
+
+  assert.equal(updateCheckView({ ...base, status: 'installing' }).restart, 'hidden')
+  assert.equal(updateCheckView({ ...base, status: 'error', version: '0.6.0' }).restart, 'enabled')
 })

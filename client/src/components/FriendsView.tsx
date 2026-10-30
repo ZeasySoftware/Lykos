@@ -3,9 +3,9 @@ import type { FormEvent } from 'react'
 import type { Relationship } from '../lib/api'
 import { errorText } from '../lib/errors'
 import { blockUser, buildUserMenu, removeFriend } from '../lib/contextMenus'
-import { FRIENDS_TABS, friendsInTab, incomingCount, relationshipShowsProfile } from '../lib/friends'
+import { FRIENDS_TABS, friendAddFeedback, friendsInTab, incomingCount, relationshipShowsProfile } from '../lib/friends'
 import type { FriendsTab } from '../lib/friends'
-import { useFriends } from '../lib/friendsStore'
+import { addFriendWithFeedback, useFriends } from '../lib/friendsStore'
 import { useContextMenu } from '../lib/menuStore'
 import { presenceLabel, statusOf } from '../lib/presence'
 import { runAction } from '../lib/toast'
@@ -141,10 +141,9 @@ function AddFriendForm({ onDone }: { onDone: () => void }) {
     setResult(null)
     try {
       const rel = await requestByName(name)
-      const who = displayName(rel.user)
       setResult({
         ok: true,
-        text: rel.type === 'friend' ? `Ihr seid jetzt befreundet – ${who} hatte dich schon angefragt.` : `Anfrage an ${who} gesendet.`,
+        text: friendAddFeedback(undefined, rel.type, displayName(rel.user)) ?? 'Ihr seid bereits befreundet.',
       })
       setUsername('')
     } catch (err) {
@@ -194,7 +193,6 @@ function FriendRow({ rel, status }: { rel: Relationship; status: ReturnType<type
   const openDm = useStore((s) => s.openDm)
   const openProfile = useStore((s) => s.openProfile)
   const voiceEnabled = useStore((s) => s.instance?.voice ?? false)
-  const addFriend = useFriends((s) => s.addFriend)
   const remove = useFriends((s) => s.remove)
   const name = displayName(rel.user)
   const menu = useContextMenu((ctx) => buildUserMenu({ userId: rel.id, communityId: null, target: ctx.target }), name)
@@ -269,7 +267,7 @@ function FriendRow({ rel, status }: { rel: Relationship; status: ReturnType<type
               type="button"
               className="icon-button ok-hover"
               title="Annehmen"
-              onClick={() => runAction(() => addFriend(rel.id))}
+              onClick={() => void addFriendWithFeedback(rel.id, name)}
             >
               <Check size={18} />
             </button>

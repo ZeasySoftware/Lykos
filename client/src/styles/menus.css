@@ -19,7 +19,6 @@
   outline: none;
   user-select: none;
   animation: menu-in var(--dur-fast) var(--ease);
-  scrollbar-width: thin;
 }
 .ctx-submenu {
   animation-duration: 90ms;

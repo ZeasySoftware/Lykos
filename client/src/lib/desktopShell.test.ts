@@ -1,7 +1,16 @@
 // Reine Logik der Desktop-Hülle. Ausführen mit `npm test` (Node mit Type-Stripping).
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { isWindows11, titlebarContext, trayBadge, trayTooltip } from './desktopShell.ts'
+import {
+  closeChoicePatch,
+  closeMode,
+  closeNeedsCallWarning,
+  initialCloseDecided,
+  isWindows11,
+  titlebarContext,
+  trayBadge,
+  trayTooltip,
+} from './desktopShell.ts'
 
 test('Titelleiste: Community, Kanal und DMs', () => {
   assert.equal(titlebarContext({ dmView: false }), null)
@@ -42,4 +51,28 @@ test('Windows 11 erkennen', () => {
   assert.equal(isWindows11('Windows', '0.3.0'), false)
   assert.equal(isWindows11('Windows', undefined), false)
   assert.equal(isWindows11('macOS', '15.0.0'), false)
+})
+
+test('Schließen: Modus aus den Einstellungen', () => {
+  assert.equal(closeMode(true, false), 'ask')
+  assert.equal(closeMode(false, false), 'ask')
+  assert.equal(closeMode(true, true), 'tray')
+  assert.equal(closeMode(false, true), 'quit')
+})
+
+test('Schließen: Bestandsnutzer mit geänderter Einstellung gelten als entschieden', () => {
+  assert.equal(initialCloseDecided({}), false)
+  assert.equal(initialCloseDecided({ closeToTray: true }), false)
+  assert.equal(initialCloseDecided({ closeToTray: false }), true)
+  assert.equal(initialCloseDecided({ closeToTray: true, closeDecided: true }), true)
+  assert.equal(initialCloseDecided({ closeToTray: false, closeDecided: false }), false)
+})
+
+test('Schließen: Antwort im Dialog merken oder nur dieses Mal', () => {
+  assert.deepEqual(closeChoicePatch('tray', true), { closeToTray: true, closeDecided: true })
+  assert.deepEqual(closeChoicePatch('quit', true), { closeToTray: false, closeDecided: true })
+  assert.equal(closeChoicePatch('quit', false), null)
+  assert.equal(closeNeedsCallWarning('quit', true), true)
+  assert.equal(closeNeedsCallWarning('quit', false), false)
+  assert.equal(closeNeedsCallWarning('tray', true), false)
 })

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { initialCloseDecided } from './desktopShell'
 
 /** Lokale App-Einstellungen (nur auf diesem Gerät). */
 interface AppSettings {
@@ -8,6 +9,8 @@ interface AppSettings {
   reduceMotion: boolean
   /** Desktop: X versteckt das Fenster in den Infobereich statt Lykos zu beenden. */
   closeToTray: boolean
+  /** Desktop: Verhalten beim Schließen ist entschieden – sonst fragt Lykos beim X nach. */
+  closeDecided: boolean
 }
 
 interface AppSettingsStore extends AppSettings {
@@ -15,11 +18,12 @@ interface AppSettingsStore extends AppSettings {
 }
 
 const KEY = 'lykos_app_settings'
-const DEFAULTS: AppSettings = { developerMode: false, reduceMotion: false, closeToTray: true }
+const DEFAULTS: AppSettings = { developerMode: false, reduceMotion: false, closeToTray: true, closeDecided: false }
 
 function load(): AppSettings {
   try {
-    return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<AppSettings>) }
+    const stored = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<AppSettings>
+    return { ...DEFAULTS, ...stored, closeDecided: initialCloseDecided(stored) }
   } catch {
     return DEFAULTS
   }
@@ -36,10 +40,10 @@ export const useAppSettings = create<AppSettingsStore>()((set, get) => {
     ...initial,
     update(patch) {
       set(patch)
-      const { developerMode, reduceMotion, closeToTray } = get()
+      const { developerMode, reduceMotion, closeToTray, closeDecided } = get()
       applyMotion(reduceMotion)
       try {
-        localStorage.setItem(KEY, JSON.stringify({ developerMode, reduceMotion, closeToTray }))
+        localStorage.setItem(KEY, JSON.stringify({ developerMode, reduceMotion, closeToTray, closeDecided }))
       } catch {
         // egal
       }

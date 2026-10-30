@@ -6,7 +6,17 @@
  * (Oberfläche von `localhost:5173`) keinen Rahmen und braucht die Titelleiste. Im Browser ist nichts davon aktiv.
  */
 import { useAppSettings } from './appSettings'
-import { isWindows11, SNAP_HOVER_DELAY_MS, trayBadge, trayTooltip, type UnreadSummary } from './desktopShell'
+import { create } from 'zustand'
+import {
+  closeChoicePatch,
+  closeMode,
+  isWindows11,
+  SNAP_HOVER_DELAY_MS,
+  trayBadge,
+  trayTooltip,
+  type CloseChoice,
+  type UnreadSummary,
+} from './desktopShell'
 import { isCommunityMuted, subscribeMutes } from './notify'
 import { toast } from './toast'
 import { communityMentionCount, isCommunityUnread, isDmUnread } from './unread'
@@ -34,7 +44,7 @@ async function currentWindow() {
 export const windowControls = {
   minimize: () => void currentWindow().then((w) => w.minimize()),
   toggleMaximize: () => void currentWindow().then((w) => w.toggleMaximize()),
-  /** Geht über `CloseRequested` – je nach Einstellung ins Tray oder wirklich schließen (siehe desktop.rs). */
+  /** Geht über `CloseRequested` – je nach Einstellung ins Tray, beenden oder nachfragen (siehe desktop.rs). */
   close: () => void currentWindow().then((w) => w.close()),
 }
 
@@ -172,17 +182,46 @@ async function onTrayAction(action: string) {
   syncTray()
 }
 
-function syncCloseToTray(enabled: boolean) {
-  void invoke('desktop_set_close_to_tray', { enabled }).catch(() => {})
+// ---------------------------------------------------------------------------
+// Schließen: Nachfrage „Lykos schließen?“ (Dialog in `CloseAppDialog.tsx`)
+// ---------------------------------------------------------------------------
+
+/** Offene Nachfrage beim Schließen (von der Rust-Seite per `close-requested` angestoßen). */
+export const useCloseAsk = create<{ open: boolean }>()(() => ({ open: false }))
+
+/**
+ * Antwort auf die Nachfrage: mit „Entscheidung merken“ dauerhaft (Einstellungen), sonst nur dieses Mal.
+ * Escape bzw. Schließen des Dialogs ruft das nicht auf – dann passiert nichts.
+ */
+export async function resolveClose(choice: CloseChoice, remember: boolean): Promise<void> {
+  const patch = closeChoicePatch(choice, remember)
+  if (patch) useAppSettings.getState().update(patch)
+  useCloseAsk.setState({ open: false })
+  await invoke('desktop_close_resolve', { action: choice })
+}
+
+function syncCloseMode() {
+  const { closeToTray, closeDecided } = useAppSettings.getState()
+  void invoke('desktop_set_close_mode', { mode: closeMode(closeToTray, closeDecided) }).catch(() => {})
 }
 
 if (hasDesktopShell) {
   document.documentElement.classList.add('has-titlebar')
 
-  syncCloseToTray(useAppSettings.getState().closeToTray)
-  useAppSettings.subscribe((s, prev) => {
-    if (s.closeToTray !== prev.closeToTray) syncCloseToTray(s.closeToTray)
-  })
+  // Erst wenn der Listener steht, „fragen“ melden – bis dahin versteckt die Rust-Seite wie bisher.
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) =>
+      listen<number>('close-requested', (e) => {
+        void invoke('desktop_close_ack', { seq: e.payload }).catch(() => {})
+        useCloseAsk.setState({ open: true })
+      }),
+    )
+    .then(() => {
+      syncCloseMode()
+      useAppSettings.subscribe((s, prev) => {
+        if (s.closeToTray !== prev.closeToTray || s.closeDecided !== prev.closeDecided) syncCloseMode()
+      })
+    })
 
   useStore.subscribe(syncTray)
   useVoice.subscribe((s, prev) => {

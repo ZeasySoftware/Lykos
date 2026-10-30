@@ -69,7 +69,7 @@ import { isChannelUnread, isCommunityUnread, isDmUnread } from './unread'
 import { DEFAULT_USER_AUDIO, useVoice } from './voice'
 import { callUser, startCall } from './callActions'
 import { friendActions } from './friends'
-import { useFriends } from './friendsStore'
+import { addFriendWithFeedback, useFriends } from './friendsStore'
 import { CommunityInfoCard } from '../components/customize/CommunityView'
 import { QuickReactions, VolumeSlider } from '../components/MenuWidgets'
 import { channelLabel, displayName, dmTitle, memberName, useStore } from '../store'
@@ -503,7 +503,7 @@ export function friendMenuItems(userId: string, name: string, isSelf: boolean): 
       label: 'Freund hinzufügen',
       icon: <UserPlus size={ICON} />,
       hidden: !can.add,
-      onSelect: () => runAction(() => f.addFriend(userId)),
+      onSelect: () => void addFriendWithFeedback(userId, name),
     },
     {
       type: 'item',
@@ -511,7 +511,7 @@ export function friendMenuItems(userId: string, name: string, isSelf: boolean): 
       label: 'Anfrage annehmen',
       icon: <Check size={ICON} />,
       hidden: !can.accept,
-      onSelect: () => runAction(() => f.addFriend(userId)),
+      onSelect: () => void addFriendWithFeedback(userId, name),
     },
     {
       type: 'item',

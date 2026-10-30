@@ -191,3 +191,90 @@ export function indicatorView(status: BackgroundStatus, version: string | null, 
       }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Einstellungen „Desktop-App“: „Nach Updates suchen“ mit Status daneben
+// ---------------------------------------------------------------------------
+
+/** Ergebnis von „Nach Updates suchen“ (Tray-Menü und Einstellungen). */
+export type ManualCheckResult = 'disabled' | 'current' | 'downloading' | 'ready' | 'failed'
+
+export interface UpdateCheckInput {
+  /** Prüfung läuft gerade. */
+  checking: boolean
+  status: BackgroundStatus
+  /** Version des gefundenen bzw. heruntergeladenen Updates. */
+  version: string | null
+  /** Download-Fortschritt in Prozent (`null` = unbekannt). */
+  progress: number | null
+  /** Ergebnis der letzten manuellen Prüfung (`null` = noch keine). */
+  lastCheck: ManualCheckResult | null
+  installedVersion: string
+  inCall: boolean
+}
+
+export interface UpdateCheckView {
+  /** Statustext neben dem Knopf (leer = keiner). */
+  text: string
+  tone: 'muted' | 'ok' | 'warn'
+  /** „Nach Updates suchen“ klickbar? */
+  canCheck: boolean
+  /** Knopf „Jetzt neu starten“: ausgeblendet, klickbar oder im Sprachanruf gesperrt. */
+  restart: 'hidden' | 'enabled' | 'blocked'
+}
+
+/** Status neben „Nach Updates suchen“ – Hintergrund-Download und manuelle Prüfung zusammengeführt. */
+export function updateCheckView(i: UpdateCheckInput): UpdateCheckView {
+  const update = i.version ? `Update ${i.version}` : 'Das Update'
+  const restart = i.inCall ? 'blocked' : 'enabled'
+  switch (i.status) {
+    case 'installing':
+      return { text: 'Update wird installiert – Lykos startet neu …', tone: 'ok', canCheck: false, restart: 'hidden' }
+    case 'downloading':
+      return {
+        text: `${update} wird geladen …${i.progress !== null ? ` ${i.progress} %` : ''}`,
+        tone: 'muted',
+        canCheck: false,
+        restart: 'hidden',
+      }
+    case 'ready':
+      return {
+        text: i.inCall ? `${update} bereit – Neustart nach dem Sprachanruf` : `${update} bereit`,
+        tone: 'ok',
+        canCheck: true,
+        restart,
+      }
+    case 'error':
+      return {
+        text: i.inCall
+          ? 'Update ließ sich nicht installieren – nach dem Sprachanruf erneut versuchen'
+          : 'Update ließ sich nicht installieren – erneut versuchen',
+        tone: 'warn',
+        canCheck: true,
+        restart,
+      }
+    case 'idle':
+      break
+  }
+  if (i.checking) return { text: 'Suche …', tone: 'muted', canCheck: false, restart: 'hidden' }
+  switch (i.lastCheck) {
+    case 'current':
+      return { text: `Lykos ist aktuell (Version ${i.installedVersion})`, tone: 'ok', canCheck: true, restart: 'hidden' }
+    case 'failed':
+      return {
+        text: 'Suche fehlgeschlagen – Update-Server nicht erreichbar. Bitte später erneut versuchen.',
+        tone: 'warn',
+        canCheck: true,
+        restart: 'hidden',
+      }
+    case 'disabled':
+      return {
+        text: 'Updates gibt es nur in der installierten Desktop-App.',
+        tone: 'muted',
+        canCheck: true,
+        restart: 'hidden',
+      }
+    default:
+      return { text: '', tone: 'muted', canCheck: true, restart: 'hidden' }
+  }
+}

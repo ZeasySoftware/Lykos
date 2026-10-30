@@ -6,6 +6,7 @@ import {
   blockedLabel,
   blockedRunStart,
   blockedRuns,
+  friendAddFeedback,
   friendActions,
   friendsInTab,
   incomingCount,
@@ -101,4 +102,18 @@ test('Nachrichten blockierter Nutzer werden zu Läufen zusammengefasst', () => {
   assert.equal(blockedRuns(msgs, () => false).size, 0)
   assert.equal(blockedLabel(1), '1 Nachricht von einem blockierten Nutzer')
   assert.equal(blockedLabel(3), '3 Nachrichten von blockierten Nutzern')
+})
+
+test('friendAddFeedback: Anfrage gesendet, Gegenanfrage, angenommen', () => {
+  assert.equal(friendAddFeedback(undefined, 'pending_out', 'Mia'), 'Freundschaftsanfrage an Mia gesendet.')
+  assert.equal(friendAddFeedback(undefined, 'friend', 'Mia'), 'Ihr seid jetzt befreundet – Mia hatte dich schon angefragt.')
+  assert.equal(friendAddFeedback('pending_in', 'friend', 'Mia'), 'Du und Mia seid jetzt befreundet.')
+  assert.equal(friendAddFeedback('friend', 'friend', 'Mia'), null)
+  assert.equal(friendAddFeedback(undefined, 'blocked', 'Mia'), null)
+})
+
+test('nach dem Senden „Anfrage zurückziehen“ statt „Freund hinzufügen“', () => {
+  const after = friendActions('pending_out', false)
+  assert.equal(after.add, false)
+  assert.equal(after.cancel, true)
 })

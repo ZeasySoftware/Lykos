@@ -41,7 +41,6 @@
   min-height: 0;
   overflow-y: auto;
   background: var(--bg-sidebar);
-  scrollbar-width: thin;
 }
 .settings-sidebar-inner {
   display: flex;

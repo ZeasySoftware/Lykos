@@ -19,6 +19,7 @@ import type { SettingsGroup } from './SettingsLayer'
 import { ProfileAppearance } from './customize/ProfileAppearance'
 import { useAdminPanel } from './admin/adminPanel'
 import { SoundSettings } from './settings/SoundSettings'
+import { UpdateSettings } from './settings/UpdateSettings'
 import { SecuritySettings } from './settings/SecuritySettings'
 import { ReauthFields } from './settings/ReauthFields'
 import { emptyReauth, reauthBody, useSecurityOverview } from '../lib/reauth'
@@ -718,6 +719,7 @@ const isWindows = /Windows/.test(navigator.userAgent)
 
 function DesktopPage() {
   const closeToTray = useAppSettings((s) => s.closeToTray)
+  const closeDecided = useAppSettings((s) => s.closeDecided)
   const update = useAppSettings((s) => s.update)
   const [autostart, setAutostartState] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
@@ -751,9 +753,20 @@ function DesktopPage() {
           title="Beim Schließen in den Infobereich minimieren"
           description="Das X versteckt Lykos nur: Die App bleibt im Infobereich der Taskleiste erreichbar, Benachrichtigungen kommen weiter und ein laufender Sprachanruf bleibt verbunden. Ganz beenden über „Beenden“ im Menü des Tray-Symbols."
           checked={closeToTray}
-          onChange={(v) => update({ closeToTray: v })}
+          onChange={(v) => update({ closeToTray: v, closeDecided: true })}
+        />
+        <SwitchRow
+          title="Beim Schließen nachfragen"
+          description="Das X fragt jedes Mal, ob Lykos in den Infobereich soll oder beendet wird – bis du „Entscheidung merken“ wählst. Ausgeschaltet gilt der Schalter oben."
+          checked={!closeDecided}
+          onChange={(v) => update({ closeDecided: !v })}
         />
       </SettingsSection>
+      {isDesktopBundle && (
+        <SettingsSection title="Updates">
+          <UpdateSettings />
+        </SettingsSection>
+      )}
       <SettingsSection title="Systemstart">
         <SwitchRow
           title={isWindows ? 'Mit Windows starten' : 'Beim Anmelden starten'}

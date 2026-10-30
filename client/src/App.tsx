@@ -14,6 +14,7 @@ import { VerifyEmailPage } from './components/AccountRecoveryPages'
 import { OidcResultNotice } from './components/settings/OidcResultNotice'
 import { Splash } from './components/Splash'
 import { Titlebar } from './components/Titlebar'
+import { CloseAppHost } from './components/CloseAppDialog'
 import { hasDesktopShell } from './lib/desktop'
 import { runStartupUpdate, useUpdater } from './lib/updater'
 import { FeedbackHost } from './components/feedback/FeedbackHub'
@@ -81,6 +82,7 @@ export default function App() {
     <>
       {hasDesktopShell && <Titlebar />}
       <AppContent />
+      {hasDesktopShell && <CloseAppHost />}
     </>
   )
 }

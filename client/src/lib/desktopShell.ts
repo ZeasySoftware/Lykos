@@ -65,3 +65,40 @@ export function isWindows11(platform: string | undefined, platformVersion: strin
 
 /** Verzögerung, bis die Snap-Layouts beim Überfahren von „Maximieren“ erscheinen (wie bei Windows). */
 export const SNAP_HOVER_DELAY_MS = 600
+
+// ---------------------------------------------------------------------------
+// Schließen: Nachfrage beim ersten X, gemerkte Entscheidung
+// ---------------------------------------------------------------------------
+
+/** Verhalten beim Schließen des Fensters, wie es die Rust-Seite erwartet (`desktop_set_close_mode`). */
+export type CloseMode = 'ask' | 'tray' | 'quit'
+/** Antwort im Dialog „Lykos schließen?“. */
+export type CloseChoice = 'tray' | 'quit'
+
+/** Modus aus den Einstellungen: unentschieden → fragen, sonst wie der Schalter „In den Infobereich“. */
+export function closeMode(closeToTray: boolean, closeDecided: boolean): CloseMode {
+  if (!closeDecided) return 'ask'
+  return closeToTray ? 'tray' : 'quit'
+}
+
+/**
+ * „Entschieden“ beim Laden der Einstellungen: gespeicherter Wert, sonst (ältere Versionen ohne das Flag) gilt
+ * als entschieden, wer „In den Infobereich minimieren“ ausgeschaltet hat – der Standard war an.
+ */
+export function initialCloseDecided(stored: { closeToTray?: unknown; closeDecided?: unknown }): boolean {
+  if (typeof stored.closeDecided === 'boolean') return stored.closeDecided
+  return stored.closeToTray === false
+}
+
+/** Einstellungen nach einer Antwort im Dialog: nur mit „Entscheidung merken“ – sonst bleibt alles beim Alten. */
+export function closeChoicePatch(
+  choice: CloseChoice,
+  remember: boolean,
+): { closeToTray: boolean; closeDecided: true } | null {
+  return remember ? { closeToTray: choice === 'tray', closeDecided: true } : null
+}
+
+/** Vor „Beenden“ warnen, wenn dabei ein Sprachanruf endet. */
+export function closeNeedsCallWarning(choice: CloseChoice, inCall: boolean): boolean {
+  return choice === 'quit' && inCall
+}

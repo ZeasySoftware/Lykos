@@ -162,24 +162,36 @@ progress {
 
 /* ---------- Scrollleisten ---------- */
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(200, 210, 235, 0.14) transparent;
+/* Schmal und unsichtbar, solange nichts scrollt; `is-scrolling` setzt lib/scrollbars.ts beim Scrollen.
+   Chromium (auch WebView2) nutzt die ::-webkit-scrollbar-Regeln – aber nur, solange weder `scrollbar-width`
+   noch `scrollbar-color` gesetzt ist (sonst native Leiste mit Pfeiltasten). Die Standard-Eigenschaften daher
+   nur für Browser ohne ::-webkit-scrollbar (Firefox). */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .is-scrolling {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
 }
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   border-radius: var(--r-full);
-  background: rgba(200, 210, 235, 0.14) padding-box;
+  background: transparent padding-box;
 }
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(200, 210, 235, 0.24);
+.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;

@@ -11,7 +11,7 @@ import { displayName, useMember, useStore } from '../store'
 import { Avatar } from './Presence'
 import { EmojiInput } from './EmojiButton'
 import { Check, Crown, Maximize2, MessageCircle, Pencil, UserCheck, UserPlus, X } from 'lucide-react'
-import { useFriends, useRelationshipType } from '../lib/friendsStore'
+import { addFriendWithFeedback, useFriends, useRelationshipType } from '../lib/friendsStore'
 import { friendActions } from '../lib/friends'
 import { runAction } from '../lib/toast'
 import { accentStyle } from '../lib/customize'
@@ -230,7 +230,7 @@ function ProfileCardInner() {
               <Pencil size={13} aria-hidden="true" /> {isSelf ? 'Eigenen Nickname ändern' : 'Nickname ändern'}
             </button>
           ))}
-        {!isSelf && <FriendActions userId={card.userId} onDone={close} />}
+        {!isSelf && <FriendActions userId={card.userId} name={name} onDone={close} />}
         <button
           type="button"
           className="link-button profile-card-edit"
@@ -248,8 +248,14 @@ function ProfileCardInner() {
 }
 
 /** Freundschafts-Schnellaktionen auf der Profilkarte (Hinzufügen, Annehmen, Nachricht …). */
-function FriendActions({ userId, onDone }: { userId: string; onDone: () => void }) {
+function FriendActions({ userId, name, onDone }: { userId: string; name: string; onDone: () => void }) {
   const type = useRelationshipType(userId)
+  // Während die Anfrage läuft, nicht doppelt senden; danach zeigt der Store den neuen Zustand.
+  const [busy, setBusy] = useState(false)
+  const add = () => {
+    setBusy(true)
+    void addFriendWithFeedback(userId, name).finally(() => setBusy(false))
+  }
   const openDm = useStore((s) => s.openDm)
   const can = friendActions(type, false)
   const f = useFriends.getState()
@@ -265,12 +271,12 @@ function FriendActions({ userId, onDone }: { userId: string; onDone: () => void 
         </button>
       )}
       {can.add && (
-        <button type="button" className="button primary small-button" onClick={() => runAction(() => f.addFriend(userId))}>
+        <button type="button" className="button primary small-button" disabled={busy} onClick={add}>
           <UserPlus size={14} aria-hidden="true" /> Freund hinzufügen
         </button>
       )}
       {can.accept && (
-        <button type="button" className="button primary small-button" onClick={() => runAction(() => f.addFriend(userId))}>
+        <button type="button" className="button primary small-button" disabled={busy} onClick={add}>
           <Check size={14} aria-hidden="true" /> Anfrage annehmen
         </button>
       )}

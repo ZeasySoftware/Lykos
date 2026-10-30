@@ -7,6 +7,7 @@ import './index.css'
 import App from './App.tsx'
 import { installDiagnostics } from './lib/diagnostics'
 import { installLongPress, installViewportTracking } from './lib/mobile'
+import { installScrollbarAutoHide } from './lib/scrollbars'
 // Globales Push-to-Talk (nur Desktop-Bundle; registriert sich am Voice-Store).
 import './lib/globalPtt'
 // Desktop-Hülle: Titelleiste, Schließen ins Tray, Tray-Menü (nur im Tauri-Fenster).
@@ -21,6 +22,7 @@ installDiagnostics()
 // Mobil: langer Druck öffnet Kontextmenüs, sichtbare Höhe folgt der Bildschirmtastatur.
 installLongPress()
 installViewportTracking()
+installScrollbarAutoHide()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

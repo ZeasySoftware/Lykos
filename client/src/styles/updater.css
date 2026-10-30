@@ -146,3 +146,27 @@
 .update-indicator[aria-disabled='true']:hover {
   background: transparent;
 }
+
+/* ---------- Einstellungen „Desktop-App“: Nach Updates suchen ---------- */
+
+.update-check {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.update-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.update-check-status {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.update-check-status.tone-ok {
+  color: var(--ok);
+}
+.update-check-status.tone-warn {
+  color: var(--warn);
+}

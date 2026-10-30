@@ -2,9 +2,12 @@
 //! Ungelesen-Punkt, Einzelinstanz, „Mit Windows starten“ (minimiert) und Snap-Layouts für die eigene
 //! Titelleiste.
 //!
-//! - **Schließen:** `CloseRequested` des Hauptfensters versteckt das Fenster, solange „Beim Schließen in den
-//!   Infobereich minimieren“ an ist (Standard; die Oberfläche meldet die Einstellung per
-//!   [`desktop_set_close_to_tray`]). Ein laufender Sprachanruf bleibt dabei aktiv – die Oberfläche läuft
+//! - **Schließen:** `CloseRequested` des Hauptfensters richtet sich nach dem Modus, den die Oberfläche per
+//!   [`desktop_set_close_mode`] meldet: `tray` versteckt das Fenster (auch bis die Oberfläche geladen ist),
+//!   `quit` schließt wirklich, `ask` schickt `close-requested` (Nutzlast: laufende Nummer) an die Oberfläche,
+//!   die nachfragt und per [`desktop_close_resolve`] antwortet. Bestätigt sie das Ereignis nicht binnen
+//!   [`CLOSE_ACK_TIMEOUT`] ([`desktop_close_ack`], z. B. weil die Seite gerade neu lädt), gilt wieder das
+//!   bisherige Verhalten: verstecken. Ein laufender Sprachanruf bleibt im Tray aktiv – die Oberfläche läuft
 //!   unsichtbar weiter. „Beenden“ im Tray-Menü beendet wirklich (`AppHandle::exit`), ebenso der Updater
 //!   (Windows: Plugin beendet den Prozess selbst, sonst `restart`) – beides geht nicht über `CloseRequested`.
 //! - **Tray-Menü:** Öffnen, Mikrofon stumm, Taub, Nach Updates suchen, Beenden. Stumm/Taub/Updates schickt
@@ -15,7 +18,8 @@
 //!   stattdessen mit Win+Z – derselbe Weg wie `tauri-plugin-decorum`.
 
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::time::Duration;
 
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -29,6 +33,10 @@ const MAIN_WINDOW: &str = "main";
 const TRAY_ID: &str = "main";
 /// Ereignis an die Oberfläche (Nutzlast: `toggle-mute`, `toggle-deaf`, `check-updates`).
 const TRAY_EVENT: &str = "tray-action";
+/// Ereignis an die Oberfläche: Nachfrage beim Schließen (Nutzlast: laufende Nummer für die Bestätigung).
+const CLOSE_EVENT: &str = "close-requested";
+/// So lange darf die Oberfläche brauchen, um die Nachfrage zu bestätigen – sonst wird versteckt.
+const CLOSE_ACK_TIMEOUT: Duration = Duration::from_millis(1500);
 const ICON_PNG: &[u8] = include_bytes!("../icons/64x64.png");
 
 /// Punkt am Tray-Symbol.
@@ -60,8 +68,39 @@ impl Badge {
   }
 }
 
+/// Verhalten beim Schließen des Hauptfensters (siehe Moduldoku).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
+enum CloseMode {
+  Tray = 0,
+  Quit = 1,
+  Ask = 2,
+}
+
+impl CloseMode {
+  fn parse(s: &str) -> Option<Self> {
+    match s {
+      "tray" => Some(Self::Tray),
+      "quit" => Some(Self::Quit),
+      "ask" => Some(Self::Ask),
+      _ => None,
+    }
+  }
+
+  fn from_u8(v: u8) -> Self {
+    match v {
+      1 => Self::Quit,
+      2 => Self::Ask,
+      _ => Self::Tray,
+    }
+  }
+}
+
 struct DesktopState {
-  close_to_tray: AtomicBool,
+  close_mode: AtomicU8,
+  /// Laufende Nummer der letzten Nachfrage bzw. der zuletzt bestätigten.
+  close_seq: AtomicU64,
+  close_acked: AtomicU64,
   mute: CheckMenuItem<Wry>,
   deaf: CheckMenuItem<Wry>,
   badge: Mutex<Badge>,
@@ -142,7 +181,9 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
     .build(app)?;
 
   app.manage(DesktopState {
-    close_to_tray: AtomicBool::new(true),
+    close_mode: AtomicU8::new(CloseMode::Tray as u8),
+    close_seq: AtomicU64::new(0),
+    close_acked: AtomicU64::new(0),
     mute,
     deaf,
     badge: Mutex::new(Badge::None),
@@ -159,26 +200,74 @@ pub fn setup(app: &mut App) -> tauri::Result<()> {
   Ok(())
 }
 
-/// `on_window_event`: Schließen des Hauptfensters → verstecken statt beenden (wenn eingestellt).
+/// `on_window_event`: Schließen des Hauptfensters → verstecken, beenden oder nachfragen (siehe Moduldoku).
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
   let WindowEvent::CloseRequested { api, .. } = event else { return };
   if window.label() != MAIN_WINDOW {
     return;
   }
-  let to_tray = window
-    .try_state::<DesktopState>()
-    .is_some_and(|s| s.close_to_tray.load(Ordering::Relaxed));
-  if to_tray {
-    api.prevent_close();
-    let _ = window.hide();
+  let Some(state) = window.try_state::<DesktopState>() else { return };
+  match CloseMode::from_u8(state.close_mode.load(Ordering::Relaxed)) {
+    CloseMode::Quit => {}
+    CloseMode::Tray => {
+      api.prevent_close();
+      let _ = window.hide();
+    }
+    CloseMode::Ask => {
+      api.prevent_close();
+      let seq = state.close_seq.fetch_add(1, Ordering::Relaxed) + 1;
+      if window.emit(CLOSE_EVENT, seq).is_err() {
+        let _ = window.hide();
+        return;
+      }
+      // Antwortet die Oberfläche nicht (lädt gerade, hängt), nicht stehen bleiben: wie bisher verstecken.
+      let window = window.clone();
+      std::thread::spawn(move || {
+        std::thread::sleep(CLOSE_ACK_TIMEOUT);
+        let acked = window
+          .try_state::<DesktopState>()
+          .is_some_and(|s| s.close_acked.load(Ordering::Relaxed) >= seq);
+        if !acked {
+          let _ = window.hide();
+        }
+      });
+    }
   }
 }
 
-/// Einstellung „Beim Schließen in den Infobereich minimieren“ übernehmen.
+/// Verhalten beim Schließen übernehmen: `ask`, `tray` oder `quit` (Einstellungen „Desktop-App“).
 #[tauri::command]
-pub fn desktop_set_close_to_tray(app: AppHandle, enabled: bool) {
+pub fn desktop_set_close_mode(app: AppHandle, mode: String) -> Result<(), String> {
+  let mode = CloseMode::parse(&mode).ok_or_else(|| format!("unbekannter Modus: {mode}"))?;
   if let Some(state) = app.try_state::<DesktopState>() {
-    state.close_to_tray.store(enabled, Ordering::Relaxed);
+    state.close_mode.store(mode as u8, Ordering::Relaxed);
+  }
+  Ok(())
+}
+
+/// Die Oberfläche hat die Nachfrage `seq` erhalten und zeigt den Dialog.
+#[tauri::command]
+pub fn desktop_close_ack(app: AppHandle, seq: u64) {
+  if let Some(state) = app.try_state::<DesktopState>() {
+    state.close_acked.fetch_max(seq, Ordering::Relaxed);
+  }
+}
+
+/// Antwort auf die Nachfrage: `tray` versteckt das Fenster, `quit` beendet Lykos.
+#[tauri::command]
+pub fn desktop_close_resolve(app: AppHandle, action: String) -> Result<(), String> {
+  match CloseMode::parse(&action) {
+    Some(CloseMode::Tray) => {
+      if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+        window.hide().map_err(|e| e.to_string())?;
+      }
+      Ok(())
+    }
+    Some(CloseMode::Quit) => {
+      app.exit(0);
+      Ok(())
+    }
+    _ => Err(format!("unbekannte Aktion: {action}")),
   }
 }
 
@@ -300,6 +389,17 @@ mod tests {
     assert_eq!(Badge::parse("unread"), Badge::Unread);
     assert_eq!(Badge::parse("none"), Badge::None);
     assert_eq!(Badge::parse("quatsch"), Badge::None);
+  }
+
+  #[test]
+  fn close_mode_roundtrip() {
+    for mode in [CloseMode::Tray, CloseMode::Quit, CloseMode::Ask] {
+      assert_eq!(CloseMode::from_u8(mode as u8), mode);
+    }
+    assert_eq!(CloseMode::parse("ask"), Some(CloseMode::Ask));
+    assert_eq!(CloseMode::parse("quatsch"), None);
+    // Unbekannter Wert → bisheriges Verhalten (verstecken).
+    assert_eq!(CloseMode::from_u8(9), CloseMode::Tray);
   }
 
   #[test]

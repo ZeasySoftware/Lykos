@@ -100,6 +100,9 @@
   --members-w: 232px;
   --search-w: 360px;
   --header-h: 52px;
+  /* Scrollleiste – nur beim Scrollen sichtbar (lib/scrollbars.ts) */
+  --scrollbar-thumb: rgba(200, 210, 235, 0.22);
+  --scrollbar-thumb-hover: rgba(200, 210, 235, 0.36);
   /* Mobil-Umbruchpunkt: 768px – Media-Queries können keine Variablen nutzen, daher zentral in
      styles/mobile.css und lib/mobile.ts (MOBILE_MAX_WIDTH). */
   /* Eigene Titelleiste der Desktop-App (nur mit `html.has-titlebar`, siehe titlebar.css) */

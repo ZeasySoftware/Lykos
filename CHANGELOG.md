@@ -8,6 +8,24 @@ Patch = Fehlerbehebungen). Migrationen laufen beim Serverstart automatisch.
 
 ## [Unveröffentlicht]
 
+## [0.5.1] – 2026-10-30
+
+### Hinzugefügt
+
+- Impressum und Datenschutzerklärung pro Instanz (`LYKOS_IMPRINT_FILE`, `LYKOS_PRIVACY_FILE`), als Seiten
+  `/impressum` und `/datenschutz` verlinkt in Anmeldung, Einstellungen und Download-Seite.
+- Desktop: Beim ersten Schließen fragt die App, ob sie beendet oder in den Infobereich minimiert werden soll
+  (mit „Entscheidung merken“); „Nach Updates suchen“ mit Status in den Einstellungen unter „Desktop-App“.
+- Rückmeldung beim Senden und Annehmen von Freundschaftsanfragen.
+- Feedback-Formular verlinkt „Issue auf GitHub anlegen“.
+
+### Geändert
+
+- Schmale Scrollleisten, die nur beim Scrollen erscheinen.
+- Release-Notizen auf der Download-Seite als Markdown; Desktop-Releases kommen von GitHub
+  (`LYKOS_DESKTOP_RELEASES_URL` kann auf die GitHub-API zeigen), Quellcode-Link auf GitHub.
+- Container-Protokolle begrenzt (3 × 10 MB), LiveKit protokolliert nur Warnungen.
+
 ## [0.5.0] – 2026-10-30
 
 Erste öffentliche Version des Quellcodes. Migrationen **0018–0021** (laufen beim Start automatisch).

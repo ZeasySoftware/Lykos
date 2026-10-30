@@ -21,11 +21,13 @@ import {
   RETRY_AFTER_FAILED_BOOT_MS,
   initialSplash,
   isStalled,
+  percentOf,
   restartBlocked,
   shouldDownload,
   splashReducer,
   withTimeout,
   type BackgroundStatus,
+  type ManualCheckResult,
   type SplashEvent,
   type SplashState,
 } from './updateFlow'
@@ -41,6 +43,11 @@ interface UpdaterStore {
   status: BackgroundStatus
   /** Version des (heruntergeladenen) Updates. */
   version: string | null
+  /** Download-Fortschritt in Prozent (`null` = unbekannt) – für die Einstellungen. */
+  progress: number | null
+  /** „Nach Updates suchen“ prüft gerade bzw. Ergebnis der letzten Prüfung. */
+  checking: boolean
+  lastCheck: ManualCheckResult | null
 }
 
 export const useUpdater = create<UpdaterStore>()(() => ({
@@ -48,6 +55,9 @@ export const useUpdater = create<UpdaterStore>()(() => ({
   splash: initialSplash,
   status: 'idle',
   version: null,
+  progress: null,
+  checking: false,
+  lastCheck: null,
 }))
 
 /** Update, dessen Bytes im Plugin liegen (bzw. gerade geladen werden). */
@@ -81,13 +91,22 @@ async function download(update: Update, onEvent?: (e: SplashEvent) => void): Pro
   const previous = pending
   pending = update
   if (previous && previous !== update) void previous.close().catch(() => {})
-  useUpdater.setState({ status: 'downloading', version: update.version })
+  useUpdater.setState({ status: 'downloading', version: update.version, progress: null })
   lastProgressAt = Date.now()
+  let total = 0
+  let done = 0
   try {
     await update.download((e) => {
       lastProgressAt = Date.now()
-      if (e.event === 'Started') onEvent?.({ type: 'started', total: e.data.contentLength ?? 0 })
-      else if (e.event === 'Progress') onEvent?.({ type: 'progress', bytes: e.data.chunkLength })
+      if (e.event === 'Started') {
+        total = e.data.contentLength ?? 0
+        onEvent?.({ type: 'started', total })
+      } else if (e.event === 'Progress') {
+        done += e.data.chunkLength
+        onEvent?.({ type: 'progress', bytes: e.data.chunkLength })
+        const progress = percentOf(done, total)
+        if (progress !== useUpdater.getState().progress) useUpdater.setState({ progress })
+      }
     })
     if (pending !== update) return false
     useUpdater.setState({ status: 'ready' })
@@ -199,22 +218,39 @@ function startBackgroundChecks(retrySoon: boolean) {
   setInterval(() => void backgroundCheck(), CHECK_INTERVAL_MS)
 }
 
-/** Ergebnis von „Nach Updates suchen“ (Tray-Menü). */
-export type ManualCheckResult = 'disabled' | 'current' | 'downloading' | 'ready' | 'failed'
+export type { ManualCheckResult }
+
+let manualCheck: Promise<ManualCheckResult> | null = null
 
 /**
- * „Nach Updates suchen“ aus dem Tray: sofort prüfen und – wie im Hintergrund – still herunterladen.
- * Danach erscheint der grüne Pfeil; neu gestartet wird weiterhin nur auf Klick.
+ * „Nach Updates suchen“ (Tray-Menü und Einstellungen „Desktop-App“): sofort prüfen und – wie im Hintergrund –
+ * still herunterladen. Danach erscheint der grüne Pfeil; neu gestartet wird weiterhin nur auf Klick. Das Ergebnis
+ * steht zusätzlich in `lastCheck` (Status in den Einstellungen).
  */
-export async function checkForUpdatesNow(): Promise<ManualCheckResult> {
+export function checkForUpdatesNow(): Promise<ManualCheckResult> {
+  // Läuft schon eine Prüfung (Tray und Einstellungen gleichzeitig), dieselbe abwarten.
+  manualCheck ??= runManualCheck()
+    .catch((): ManualCheckResult => 'failed')
+    .then((result) => {
+      manualCheck = null
+      useUpdater.setState({ checking: false, lastCheck: result })
+      return result
+    })
+  return manualCheck
+}
+
+async function runManualCheck(): Promise<ManualCheckResult> {
   if (!updaterEnabled) return 'disabled'
   const before = useUpdater.getState().status
   if (before === 'downloading' || before === 'installing') return 'downloading'
+  useUpdater.setState({ checking: true, lastCheck: null })
   let update: Update | null
   try {
     update = await checkUpdate()
   } catch {
     return 'failed'
+  } finally {
+    useUpdater.setState({ checking: false })
   }
   if (!update) return useUpdater.getState().status === 'ready' ? 'ready' : 'current'
   const { status, version } = useUpdater.getState()

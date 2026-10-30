@@ -6,6 +6,8 @@
 import { create } from 'zustand'
 import { endpoints } from './api'
 import type { Relationship, RelationshipType } from './api'
+import { friendAddFeedback } from './friends'
+import { toast, toastError } from './toast'
 
 interface FriendsState {
   /** user_id → Beziehung. */
@@ -19,8 +21,8 @@ interface FriendsState {
 
   /** Anfrage per Benutzername; nimmt eine offene Gegenanfrage an. */
   requestByName: (username: string) => Promise<Relationship>
-  /** Anfrage senden bzw. annehmen. */
-  addFriend: (userId: string) => Promise<void>
+  /** Anfrage senden bzw. annehmen; liefert die neue Beziehung. */
+  addFriend: (userId: string) => Promise<Relationship>
   /** Freund entfernen, Anfrage ablehnen/zurückziehen, Blockade aufheben. */
   remove: (userId: string) => Promise<void>
   block: (userId: string) => Promise<void>
@@ -54,7 +56,9 @@ export const useFriends = create<FriendsState>()((set, get) => ({
   },
 
   addFriend: async (userId) => {
-    get().applyAdd(await endpoints.putRelationship(userId, 'friend'))
+    const r = await endpoints.putRelationship(userId, 'friend')
+    get().applyAdd(r)
+    return r
   },
 
   remove: async (userId) => {
@@ -75,4 +79,21 @@ export function useRelationshipType(userId: string | undefined): RelationshipTyp
 /** Hat man den Nutzer blockiert? (Nicht reaktiv – für Menüs und Event-Handler.) */
 export function isBlocked(userId: string | undefined): boolean {
   return !!userId && useFriends.getState().relationships[userId]?.type === 'blocked'
+}
+
+/**
+ * Anfrage senden bzw. annehmen – mit Rückmeldung als Toast (Erfolg wie „Freundschaftsanfrage an … gesendet“,
+ * Fehler mit deutschem Text). Gemeinsamer Weg für Profilkarte, Kontextmenüs und Freundesliste; Knöpfe und
+ * Menüpunkte zeigen danach über den Store den neuen Zustand („Anfrage zurückziehen“).
+ */
+export async function addFriendWithFeedback(userId: string, name: string): Promise<void> {
+  const s = useFriends.getState()
+  const before = s.relationships[userId]?.type
+  try {
+    const r = await s.addFriend(userId)
+    const text = friendAddFeedback(before, r.type, name)
+    if (text) toast(text)
+  } catch (e) {
+    toastError(e)
+  }
 }

@@ -97,6 +97,23 @@ export function friendActions(type: RelationshipType | undefined, isSelf: boolea
 }
 
 /**
+ * Rückmeldung nach „Freund hinzufügen“ bzw. „Anfrage annehmen“ (Toast und Formular „Freund hinzufügen“):
+ * `before` ist die Beziehung vor der Aktion, `after` die Antwort des Servers. Eine offene Gegenanfrage nimmt
+ * der Server direkt an – dann seid ihr sofort befreundet. `null` = keine Meldung nötig.
+ */
+export function friendAddFeedback(
+  before: RelationshipType | undefined,
+  after: RelationshipType,
+  name: string,
+): string | null {
+  if (after === 'pending_out') return `Freundschaftsanfrage an ${name} gesendet.`
+  if (after !== 'friend' || before === 'friend') return null
+  return before === 'pending_in'
+    ? `Du und ${name} seid jetzt befreundet.`
+    : `Ihr seid jetzt befreundet – ${name} hatte dich schon angefragt.`
+}
+
+/**
  * Zeigt der Server das volle Profil über die Beziehung? Nur Freunden und bei eingehender Anfrage – eine eigene
  * Anfrage oder Blockade öffnet das Profil eines Fremden nicht (gemeinsame Community/DM aber weiterhin).
  */
