@@ -8,6 +8,21 @@ Patch = Fehlerbehebungen). Migrationen laufen beim Serverstart automatisch.
 
 ## [Unveröffentlicht]
 
+## [0.6.1] – 2026-11-02
+
+### Hinzugefügt
+
+- **Beitrittsrolle:** Beim Anlegen einer Community wird eine Rolle festgelegt (z. B. „Mitglied“ oder „Azubi“), die
+  jedes neue Mitglied beim Beitritt automatisch bekommt – auch der Ersteller. In den Einstellungen unter „Rollen“
+  lässt sie sich wechseln oder abschalten (braucht „Community verwalten“ und „Rollen verwalten“, nur Rollen unter
+  der eigenen höchsten). Migration 0027.
+
+### Geändert
+
+- **Mitgliederliste nach Rollen geordnet:** Online-Mitglieder stehen unter ihrer höchsten Rolle in der Reihenfolge
+  der Rollenhierarchie, wer keine Rolle hat, unter „Online“. Offline-Mitglieder bleiben eine Gruppe, innerhalb nach
+  Rolle sortiert.
+
 ## [0.6.0] – 2026-10-30
 
 ### Hinzugefügt

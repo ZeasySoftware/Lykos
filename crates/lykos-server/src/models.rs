@@ -135,6 +135,8 @@ pub struct Community {
     pub afk_channel_id: Option<Uuid>,
     /// Sekunden ohne Aktivität, nach denen der Client in den AFK-Kanal wechselt.
     pub afk_timeout_seconds: i32,
+    /// Rolle, die neue Mitglieder beim Beitritt automatisch bekommen; `null` = keine.
+    pub join_role_id: Option<Uuid>,
 }
 
 /// Spalten für `CommunityRow` (Tabellen-Alias `c`).
@@ -143,7 +145,7 @@ macro_rules! community_columns {
     () => {
         "c.id, c.name, c.owner_id, c.message_retention_days, c.upload_quota_mb, c.created_at,
          c.icon_id, c.banner_id, c.description, c.accent_color, c.system_channel_id,
-         c.join_messages_enabled, c.welcome_message, c.afk_channel_id, c.afk_timeout_seconds"
+         c.join_messages_enabled, c.welcome_message, c.afk_channel_id, c.afk_timeout_seconds, c.join_role_id"
     };
 }
 
@@ -164,6 +166,7 @@ pub struct CommunityRow {
     welcome_message: Option<String>,
     afk_channel_id: Option<Uuid>,
     afk_timeout_seconds: i32,
+    join_role_id: Option<Uuid>,
 }
 
 impl From<CommunityRow> for Community {
@@ -184,6 +187,7 @@ impl From<CommunityRow> for Community {
             welcome_message: r.welcome_message,
             afk_channel_id: r.afk_channel_id,
             afk_timeout_seconds: r.afk_timeout_seconds,
+            join_role_id: r.join_role_id,
         }
     }
 }

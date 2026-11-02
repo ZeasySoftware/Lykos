@@ -12,6 +12,26 @@ import { EmojiInput } from './EmojiButton'
 import { Check, ChevronRight, Hash, Import, Volume2 } from 'lucide-react'
 import { InviteCard } from './customize/CommunityView'
 
+/** Pflichtfeld beim Anlegen: Name der Rolle, die jedes neue Mitglied automatisch bekommt. */
+function JoinRoleField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="field">
+      <span>Beitrittsrolle</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="z. B. Mitglied oder Azubi"
+        maxLength={64}
+        required
+      />
+      <span className="muted small">
+        Jedes Mitglied bekommt diese Rolle beim Beitritt automatisch. Rechte und Farbe stellst du danach unter
+        Rollen ein; die Beitrittsrolle lässt sich dort auch wechseln.
+      </span>
+    </label>
+  )
+}
+
 /** Community anlegen (leer oder aus einer Discord-Vorlage) oder per Einladung beitreten. */
 export function AddCommunityDialog({ onClose }: { onClose: () => void }) {
   const createCommunity = useStore((s) => s.createCommunity)
@@ -23,6 +43,7 @@ export function AddCommunityDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'create' | 'join'>(canCreate ? 'create' : 'join')
   const [fromTemplate, setFromTemplate] = useState(false)
   const [name, setName] = useState('')
+  const [joinRole, setJoinRole] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -30,9 +51,13 @@ export function AddCommunityDialog({ onClose }: { onClose: () => void }) {
   async function submit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    if (tab === 'create' && !joinRole.trim()) {
+      setError('Bitte eine Beitrittsrolle angeben.')
+      return
+    }
     setBusy(true)
     try {
-      if (tab === 'create') await createCommunity(name.trim())
+      if (tab === 'create') await createCommunity(name.trim(), joinRole.trim())
       else await acceptInvite(extractInviteCode(code))
       onClose()
     } catch (err) {
@@ -67,6 +92,7 @@ export function AddCommunityDialog({ onClose }: { onClose: () => void }) {
               <span>Name der Community</span>
               <EmojiInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus required />
             </label>
+            <JoinRoleField value={joinRole} onChange={setJoinRole} />
             <button type="button" className="template-import-link" onClick={() => setFromTemplate(true)}>
               <Import size={18} aria-hidden="true" />
               <span>
@@ -108,6 +134,7 @@ function DiscordTemplateDialog({ onBack, onClose }: { onBack: () => void; onClos
   const [link, setLink] = useState('')
   const [preview, setPreview] = useState<DiscordTemplatePreview | null>(null)
   const [name, setName] = useState('')
+  const [joinRole, setJoinRole] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -132,9 +159,13 @@ function DiscordTemplateDialog({ onBack, onClose }: { onBack: () => void; onClos
       }
       return
     }
+    if (!joinRole.trim()) {
+      setError('Bitte eine Beitrittsrolle angeben.')
+      return
+    }
     setBusy(true)
     try {
-      await createFromTemplate(preview.code, name.trim())
+      await createFromTemplate(preview.code, name.trim(), joinRole.trim())
       onClose()
     } catch (err) {
       setError(errorText(err))
@@ -157,6 +188,7 @@ function DiscordTemplateDialog({ onBack, onClose }: { onBack: () => void; onClos
               <span>Name der Community</span>
               <EmojiInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus required />
             </label>
+            <JoinRoleField value={joinRole} onChange={setJoinRole} />
             {preview.description && <p className="muted small">{preview.description}</p>}
             <TemplateStructure preview={preview} />
             <ul className="template-notes">

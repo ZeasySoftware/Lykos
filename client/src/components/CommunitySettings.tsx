@@ -300,6 +300,7 @@ function OverviewPage({ detail }: { detail: CommunityDetail }) {
 function RolesPage({ detail }: { detail: CommunityDetail }) {
   const loadDetail = useStore((s) => s.loadDetail)
   const setRoles = useStore((s) => s.setRoles)
+  const storeUpdateCommunity = useStore((s) => s.updateCommunity)
   const user = useStore((s) => s.user)
   const members = useStore((s) => s.members[detail.community.id])
   const loadMembers = useStore((s) => s.loadMembers)
@@ -344,6 +345,26 @@ function RolesPage({ detail }: { detail: CommunityDetail }) {
   function select(id: string) {
     if (id === selected?.id || blocked()) return
     setSelectedId(id)
+  }
+
+  // Beitrittsrolle: braucht „Community verwalten“ + „Rollen verwalten“ und eine Rolle unter der eigenen höchsten.
+  const joinRoleId = detail.community.join_role_id ?? null
+  const joinRole = roles.find((r) => r.id === joinRoleId && !r.is_default) ?? null
+  const canSetJoinRole =
+    has(detail.permissions, Permission.MANAGE_COMMUNITY) &&
+    has(detail.permissions, Permission.MANAGE_ROLES) &&
+    (!joinRole || canManage(joinRole))
+
+  async function changeJoinRole(id: string) {
+    setError(null)
+    setBusy(true)
+    try {
+      storeUpdateCommunity(await endpoints.updateCommunity(communityId, { join_role_id: id || null }))
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function create() {
@@ -409,6 +430,11 @@ function RolesPage({ detail }: { detail: CommunityDetail }) {
       >
         <span className="role-dot" style={{ background: roleColor(r.color) }} aria-hidden="true" />
         <span className="truncate">{r.name}</span>
+        {r.id === joinRole?.id && (
+          <span className="role-join-badge" title="Neue Mitglieder bekommen diese Rolle automatisch">
+            Beitritt
+          </span>
+        )}
         <span className="admin-list-count" title={`${count} Mitglieder`}>
           {count}
         </span>
@@ -422,6 +448,24 @@ function RolesPage({ detail }: { detail: CommunityDetail }) {
       description="Mitglieder haben die Rechte aller ihrer Rollen zusammen. Oben steht die höchste Rolle – ziehen oder Pfeile nutzen, um die Reihenfolge zu ändern. Du verwaltest nur Rollen unter deiner höchsten."
     >
       {error && <p className="error">{error}</p>}
+      <label className="field join-role-field">
+        <span>Beitrittsrolle</span>
+        <select
+          value={joinRole?.id ?? ''}
+          onChange={(e) => void changeJoinRole(e.target.value)}
+          disabled={!canSetJoinRole || busy}
+        >
+          <option value="">Keine</option>
+          {ordered.map((r) => (
+            <option key={r.id} value={r.id} disabled={!canManage(r)}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <span className="muted small">
+          Neue Mitglieder bekommen diese Rolle beim Beitritt automatisch. Wer schon Mitglied ist, behält seine Rollen.
+        </span>
+      </label>
       <div className="admin-split roles-split">
         <div className="roles-column">
           <div className="roles-column-head">

@@ -32,7 +32,7 @@ Fehler antworten mit passendem Status und `{ "error": "<code>" }`.
 
 | Status | Codes |
 |---|---|
-| 400 | `invalid_username`, `invalid_password`, `invalid_name`, `invalid_content`, `invalid_kind`, `invalid_request`, `not_a_text_channel`, `too_many_attachments`, `invalid_attachments`, `not_a_voice_channel`, `invalid_reply`, `invalid_emoji`, `too_many_reactions`, `too_many_pins`, `invalid_image`, `invalid_bio`, `invalid_status_text`, `too_many_recipients`, `not_a_group_dm`, `cannot_leave_dm`, `invalid_email`, `email_unavailable` (kein Mailversand bzw. keine bestätigte Adresse), `email_unchanged`, `invalid_token` (Link ungültig/abgelaufen/verbraucht), `invalid_code`, `totp_not_started`, `invalid_title`, `invalid_description`, `invalid_tech_info`, `invalid_status`, `not_a_suggestion`, `invalid_pronouns`, `invalid_color`, `invalid_channel`, `too_many_emojis`, `invalid_bitrate`, `invalid_user_limit`, `not_in_call`, `cannot_ban_self`, `invalid_reason`, `invalid_welcome_message`, `too_many_dm_pins`, `invalid_keyword`, `invalid_domain`, `invalid_limit`, `invalid_message`, `invalid_actions`, `alert_channel_required` (AutoMod-Verwaltung), `invalid_embeds`, `empty_message` (Webhook ohne Text und Embeds), `attachments_not_supported` (Webhook mit Dateien), `invalid_json` |
+| 400 | `invalid_username`, `invalid_password`, `invalid_name`, `invalid_content`, `invalid_kind`, `invalid_request`, `not_a_text_channel`, `too_many_attachments`, `invalid_attachments`, `not_a_voice_channel`, `invalid_reply`, `invalid_emoji`, `too_many_reactions`, `too_many_pins`, `invalid_image`, `invalid_bio`, `invalid_status_text`, `too_many_recipients`, `not_a_group_dm`, `cannot_leave_dm`, `invalid_email`, `email_unavailable` (kein Mailversand bzw. keine bestätigte Adresse), `email_unchanged`, `invalid_token` (Link ungültig/abgelaufen/verbraucht), `invalid_code`, `totp_not_started`, `invalid_title`, `invalid_description`, `invalid_tech_info`, `invalid_status`, `not_a_suggestion`, `invalid_pronouns`, `invalid_color`, `invalid_channel`, `too_many_emojis`, `invalid_bitrate`, `invalid_user_limit`, `not_in_call`, `cannot_ban_self`, `invalid_reason`, `invalid_welcome_message`, `too_many_dm_pins`, `invalid_keyword`, `invalid_domain`, `invalid_limit`, `invalid_message`, `invalid_actions`, `alert_channel_required` (AutoMod-Verwaltung), `invalid_role` (Beitrittsrolle), `invalid_embeds`, `empty_message` (Webhook ohne Text und Embeds), `attachments_not_supported` (Webhook mit Dateien), `invalid_json` |
 | 401 | `unauthorized`, `invalid_credentials`, `invalid_code` (2FA-Code falsch), `invalid_mfa_token` (zweiter Anmeldeschritt abgelaufen/verbraucht), `invalid_webhook_token` |
 | 403 | `forbidden`, `registration_closed`, `invite_required`, `wrong_password` (Passwortbestätigung falsch), `dm_not_allowed`, `friend_request_not_allowed`, `mfa_code_required`, `invalid_code` (Re-Authentifizierung), `reauth_required` (Konto ohne Passwort: Sitzung älter als 10 min), `account_disabled` (Konto gesperrt), `channel_full` (Sprachkanal hat sein Nutzerlimit erreicht), `call_not_allowed` (1:1-DM mit Blockade: kein Anruf), `banned` (in der Community gebannt: Einladung annehmen geht nicht), `automod_blocked` (Nachricht vom AutoMod blockiert, siehe „AutoMod“), `bots_not_allowed` (Endpunkt für Bots gesperrt), `bots_disabled` (Instanz erlaubt keine Bots) |
 | 404 | `not_found`, `invalid_invite`, `invalid_reset_token`, `unknown_webhook`, `unknown_message` (keine Nachricht dieses Webhooks), `unknown_bot` |
@@ -53,7 +53,8 @@ Community { id, name, owner_id, message_retention_days: number | null, upload_qu
             icon_url: string | null, banner_url: string | null, description: string | null,
             accent_color: number | null, system_channel_id: string | null,
             join_messages_enabled: boolean, welcome_message: string | null,
-            afk_channel_id: string | null, afk_timeout_seconds: 60 | 300 | 900 | 1800 | 3600 }
+            afk_channel_id: string | null, afk_timeout_seconds: 60 | 300 | 900 | 1800 | 3600,
+            join_role_id: string | null }
 Ban       { user: UserPublic, reason: string | null, banned_by: UserPublic | null, created_at }
 Channel   { id, community_id: string | null, name, kind: 'text' | 'voice' | 'dm' | 'group_dm', topic: string | null, position: number,
             audio_bitrate: number /* kbit/s, 32–256, Standard 64 */, audio_stereo: boolean, audio_dtx: boolean, audio_red: boolean,
@@ -107,9 +108,9 @@ TechInfo  { app_version: string | null, platform: 'web' | 'desktop' | null, os: 
             window: { width, height } | null, view: string | null, errors: { at: string | null, message }[] }
 ```
 
-Audit-Aktionen (`action`, `target_id`, `data`): `community.create` (–, `{name}`), `community.update`
+Audit-Aktionen (`action`, `target_id`, `data`): `community.create` (–, `{name, discord_template, join_role}`), `community.update`
 (–, `{name, message_retention_days, upload_quota_mb, description, accent_color, system_channel_id,
-join_messages_enabled, welcome_message, afk_channel_id, afk_timeout_seconds}`),
+join_messages_enabled, welcome_message, afk_channel_id, afk_timeout_seconds, join_role_id}`),
 `community.icon_set|icon_remove|banner_set|banner_remove` (–, `{}`), `channel.create|update|delete` (Kanal, `{name, kind}`/geänderte Ton-Felder `{audio_bitrate?, audio_stereo?, audio_dtx?, audio_red?, user_limit?}` (sonst `{}`)/`{name}`),
 `channel.override_set` (Kanal, `{role_id, allow, deny}`), `channel.override_delete` (Kanal, `{role_id}`),
 `role.create|update|delete` (Rolle, `{name}`/`{name, permissions}`/`{name}`), `role.reorder` (–, `{role_ids}`),
@@ -342,10 +343,10 @@ Community der Einladung direkt bei.
 | Methode | Pfad | Recht | Antwort |
 |---|---|---|---|
 | GET | `/communities` | – | `Community[]` (eigene) |
-| POST | `/communities` | – | `{ name?, discord_template? }` → `CommunityDetail` – legt Standardrolle, `#allgemein` (Text, zugleich Systemkanal) und `Sprachkanal` (Voice) an bzw. mit `discord_template` die Struktur der Vorlage (siehe unten; `name` dann optional, Vorgabe = Name der Vorlage); ist `allow_community_creation` aus, nur für Instanz-Admins (sonst `403 community_creation_disabled`) |
+| POST | `/communities` | – | `{ name?, discord_template?, join_role? }` → `CommunityDetail` – legt Standardrolle, ggf. Beitrittsrolle (siehe unten), `#allgemein` (Text, zugleich Systemkanal) und `Sprachkanal` (Voice) an bzw. mit `discord_template` die Struktur der Vorlage (siehe unten; `name` dann optional, Vorgabe = Name der Vorlage); ist `allow_community_creation` aus, nur für Instanz-Admins (sonst `403 community_creation_disabled`) |
 | GET | `/communities/templates/discord/{code}` | wie Anlegen | `DiscordTemplatePreview` – Vorschau einer Discord-Servervorlage |
 | GET | `/communities/{id}` | Mitglied | `CommunityDetail` |
-| PATCH | `/communities/{id}` | `MANAGE_COMMUNITY` | `{ name?, message_retention_days?, upload_quota_mb?, description?, accent_color?, system_channel_id?, join_messages_enabled?, welcome_message?, afk_channel_id?, afk_timeout_seconds? }` → `Community` (`message_retention_days: null` = unbegrenzt; `upload_quota_mb`: 1–10 000 000 oder `null` = kein Community-Kontingent; Gestaltung und AFK-Kanal siehe unten) |
+| PATCH | `/communities/{id}` | `MANAGE_COMMUNITY` | `{ name?, message_retention_days?, upload_quota_mb?, description?, accent_color?, system_channel_id?, join_messages_enabled?, welcome_message?, afk_channel_id?, afk_timeout_seconds?, join_role_id? }` → `Community` (`message_retention_days: null` = unbegrenzt; `upload_quota_mb`: 1–10 000 000 oder `null` = kein Community-Kontingent; Gestaltung und AFK-Kanal siehe unten) |
 | POST | `/communities/{id}/icon` | `MANAGE_COMMUNITY` | `multipart/form-data`, Feld `file` → `Community` |
 | DELETE | `/communities/{id}/icon` | `MANAGE_COMMUNITY` | `Community` |
 | POST | `/communities/{id}/banner` | `MANAGE_COMMUNITY` | `multipart/form-data`, Feld `file` → `Community` |
@@ -401,6 +402,14 @@ ein erneuter Bann aktualisiert Grund, Moderator und Zeitpunkt. `reason`: max. 51
 diesem Zeitraum samt Anhängen – in Portionen zu 500, je Nachricht ein `MESSAGE_DELETE` wie beim normalen Löschen.
 Audit-Log: `member.ban` bzw. `member.unban`. Wird das gebannte Konto gelöscht, verschwindet der Bann; wird der Moderator
 gelöscht, bleibt `banned_by: null`. Der Datenexport enthält `community_bans: { received, issued }`.
+
+**Beitrittsrolle:** Jedes neue Mitglied bekommt `join_role_id` beim Beitritt automatisch (Einladung, Instanz-Einladung
+mit Community; nicht Bots). `POST /communities` mit `join_role` (Name, 1–64 Zeichen nach Trimmen, sonst
+`400 invalid_name`) legt sie als unterste Rolle ohne eigene Rechte an und gibt sie auch dem Ersteller; ohne
+`join_role` gibt es keine (der Client verlangt sie beim Anlegen). Ändern per `PATCH` braucht zusätzlich
+`MANAGE_ROLES`, und die Rolle muss unter der eigenen höchsten liegen (sonst `403`); sie muss zur Community gehören und
+darf nicht „@alle“ sein (`400 invalid_role`); `null` = keine. Wird die Rolle gelöscht, wird `join_role_id` `null`.
+Bestehende Mitglieder behalten ihre Rollen.
 
 **AFK-Kanal:** `afk_channel_id` ist ein Sprachkanal derselben Community oder `null` (sonst `400 invalid_channel`; wird
 der Kanal gelöscht, wieder `null`), `afk_timeout_seconds` einer der Werte 60, 300, 900, 1800, 3600 (Standard 300,

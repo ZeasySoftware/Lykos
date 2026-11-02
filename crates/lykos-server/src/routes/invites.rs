@@ -20,7 +20,7 @@ use crate::{
     routes::{
         bans,
         communities::{self, CommunityDetail},
-        customization,
+        customization, roles,
     },
     state::AppState,
 };
@@ -304,6 +304,7 @@ pub async fn redeem_for_registration(
     if inserted == 0 {
         return Ok(None);
     }
+    roles::assign_join_role(&mut *conn, community_id, user_id).await?;
     audit::record(
         &mut *conn,
         community_id,
@@ -348,6 +349,7 @@ pub async fn join_via_invite(
     if inserted == 0 {
         return Err(ApiError::Conflict("already_member"));
     }
+    roles::assign_join_role(&mut *conn, community_id, user_id).await?;
 
     sqlx::query("UPDATE invites SET uses = uses + 1 WHERE code = $1").bind(code).execute(&mut *conn).await?;
     audit::record(&mut *conn, community_id, user_id, "member.join", Some(user_id), json!({ "invite": code }))

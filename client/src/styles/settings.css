@@ -434,6 +434,20 @@
 .roles-column-head .settings-nav-title {
   padding-left: 22px;
 }
+/* Kennzeichen der Beitrittsrolle in der Rollenliste; schiebt die Zahl nicht weg (die hat margin-left: auto). */
+.role-join-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: var(--bg-content);
+  color: var(--text-muted);
+  font-size: var(--fs-2xs);
+  font-weight: 550;
+}
+.join-role-field {
+  max-width: 420px;
+  margin-bottom: var(--sp-4);
+}
 .admin-list-count {
   margin-left: auto;
   color: var(--text-faint);

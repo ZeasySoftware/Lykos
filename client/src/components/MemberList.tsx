@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import type { CommunityDetail, Member, Role } from '../lib/api'
 import { buildUserMenu } from '../lib/contextMenus'
 import { errorText } from '../lib/errors'
+import { groupMembers } from '../lib/memberGroups'
 import { useContextMenu } from '../lib/menuStore'
 import { statusOf } from '../lib/presence'
 import { memberName, useStore } from '../store'
@@ -57,22 +58,17 @@ export function MemberList({ detail, onClose }: { detail: CommunityDetail; onClo
     [members],
   )
 
-  // Präsenz: in Online (inkl. abwesend/nicht stören) und Offline gruppieren. Der Selektor liefert nur die
+  // Präsenz: Online-Mitglieder (inkl. abwesend/nicht stören) nach höchster Rolle gruppieren, Offline als eigene
+  // Gruppe (siehe lib/memberGroups.ts). Der Selektor liefert nur die
   // IDs der Online-Mitglieder (flach verglichen) – die Liste rendert also nur neu, wenn jemand die Gruppe
   // wechselt. Wechsel zwischen online/abwesend/bitte nicht stören übernimmt die Zeile selbst.
   const onlineIds = useStore(
     useShallow((s) => sorted.filter((m) => statusOf(s, m.user.id) !== 'offline').map((m) => m.user.id)),
   )
-  const groups = useMemo(() => {
-    const online = new Set(onlineIds)
-    // Bots stehen unabhängig vom Status in einer eigenen Gruppe.
-    const humans = sorted.filter((m) => !m.user.bot)
-    return [
-      { title: 'Online', items: humans.filter((m) => online.has(m.user.id)) },
-      { title: 'Offline', items: humans.filter((m) => !online.has(m.user.id)) },
-      { title: 'Bots', items: sorted.filter((m) => m.user.bot) },
-    ].filter((g) => g.items.length > 0)
-  }, [sorted, onlineIds])
+  const groups = useMemo(
+    () => groupMembers(sorted, new Set(onlineIds), detail.roles),
+    [sorted, onlineIds, detail.roles],
+  )
 
   return (
     <aside className={`members${onClose ? ' members-overlay' : ''}`} aria-label="Mitglieder">
@@ -87,7 +83,7 @@ export function MemberList({ detail, onClose }: { detail: CommunityDetail; onClo
       {error && <p className="error small">{error}</p>}
       <div className="members-scroll">
         {groups.map((group) => (
-          <section key={group.title} className="member-group">
+          <section key={group.key} className="member-group">
             <h3 className="member-group-title">
               {group.title} — {group.items.length}
             </h3>

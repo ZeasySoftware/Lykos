@@ -114,6 +114,10 @@ pub struct CreateBody {
     name: Option<String>,
     /// Discord-Servervorlage (Link oder Code), deren Struktur übernommen wird.
     discord_template: Option<String>,
+    /// Name der Beitrittsrolle (z. B. „Mitglied“): Sie wird angelegt (unterste Rolle, ohne eigene Rechte) und
+    /// jedes Mitglied bekommt sie beim Beitritt automatisch – auch der Ersteller. Der Client verlangt sie;
+    /// ohne Angabe gibt es keine Beitrittsrolle.
+    join_role: Option<String>,
 }
 
 /// Darf der Nutzer Communities anlegen? (Instanz-Einstellung: ggf. nur Instanz-Admins.)
@@ -149,6 +153,7 @@ pub async fn create(
     Json(body): Json<CreateBody>,
 ) -> ApiResult<(StatusCode, Json<CommunityDetail>)> {
     let name = body.name.as_deref().map(validate_name).transpose()?;
+    let join_role = body.join_role.as_deref().map(roles::validate_role_name).transpose()?;
     require_creation_allowed(&state, user.user_id).await?;
     let template = match body.discord_template.as_deref() {
         Some(source) => Some(fetch_discord_template(&state, user.user_id, source).await?),
@@ -206,13 +211,36 @@ pub async fn create(
                 .await?;
         }
     }
+    if let Some(join_role) = &join_role {
+        // Unterste Rolle (unter allen übernommenen Vorlagen-Rollen), Rechte kommen von „@alle“.
+        let join_role_id = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO roles (id, community_id, name, permissions, position)
+             VALUES ($1, $2, $3, 0, (SELECT COALESCE(max(position) + 1, 1) FROM roles WHERE community_id = $2))",
+        )
+        .bind(join_role_id)
+        .bind(community_id)
+        .bind(join_role)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("UPDATE communities SET join_role_id = $2 WHERE id = $1")
+            .bind(community_id)
+            .bind(join_role_id)
+            .execute(&mut *tx)
+            .await?;
+        roles::assign_join_role(&mut tx, community_id, user.user_id).await?;
+    }
     audit::record(
         &mut *tx,
         community_id,
         user.user_id,
         "community.create",
         None,
-        json!({ "name": name, "discord_template": template.as_ref().map(|t| &t.code) }),
+        json!({
+            "name": name,
+            "discord_template": template.as_ref().map(|t| &t.code),
+            "join_role": join_role,
+        }),
     )
     .await?;
     tx.commit().await?;
@@ -256,6 +284,10 @@ pub struct UpdateBody {
     afk_channel_id: Option<Option<Uuid>>,
     /// Zeit bis zum Wechsel in den AFK-Kanal: 60, 300, 900, 1800 oder 3600 Sekunden.
     afk_timeout_seconds: Option<i32>,
+    /// Beitrittsrolle (`null` = keine). Braucht zusätzlich `MANAGE_ROLES` und eine Rolle unterhalb der eigenen
+    /// höchsten – sonst könnte man allen Neuen eine Rolle geben, die man selbst nicht vergeben darf.
+    #[serde(default, deserialize_with = "double_option")]
+    join_role_id: Option<Option<Uuid>>,
 }
 
 /// Erlaubte AFK-Zeiten in Sekunden (wie bei Discord: 1, 5, 15, 30, 60 Minuten).
@@ -314,6 +346,16 @@ pub async fn update(
     if body.afk_timeout_seconds.is_some_and(|t| !AFK_TIMEOUTS.contains(&t)) {
         return Err(ApiError::BadRequest("invalid_request"));
     }
+    if let Some(join_role_id) = body.join_role_id {
+        permissions::require(ctx.base(), Permissions::MANAGE_ROLES)?;
+        if let Some(role_id) = join_role_id {
+            let role = models::role_by_id(&state.db, role_id)
+                .await?
+                .filter(|r| r.community_id == community_id && !r.is_default)
+                .ok_or(ApiError::BadRequest("invalid_role"))?;
+            roles::require_outranks(&state.db, &ctx, &role).await?;
+        }
+    }
 
     let mut tx = state.db.begin().await?;
     // Darstellung: Feld nur setzen, wenn es im Body vorkam ($n = true).
@@ -325,7 +367,8 @@ pub async fn update(
             join_messages_enabled = COALESCE($8, join_messages_enabled),
             welcome_message       = CASE WHEN $9 THEN $10 ELSE welcome_message END,
             afk_channel_id        = CASE WHEN $11 THEN $12 ELSE afk_channel_id END,
-            afk_timeout_seconds   = COALESCE($13, afk_timeout_seconds)
+            afk_timeout_seconds   = COALESCE($13, afk_timeout_seconds),
+            join_role_id          = CASE WHEN $14 THEN $15 ELSE join_role_id END
          WHERE id = $1",
     )
     .bind(community_id)
@@ -341,6 +384,8 @@ pub async fn update(
     .bind(body.afk_channel_id.is_some())
     .bind(body.afk_channel_id.flatten())
     .bind(body.afk_timeout_seconds)
+    .bind(body.join_role_id.is_some())
+    .bind(body.join_role_id.flatten())
     .execute(&mut *tx)
     .await?;
     if let Some(name) = &name {
@@ -381,6 +426,7 @@ pub async fn update(
             "welcome_message": welcome_message,
             "afk_channel_id": body.afk_channel_id,
             "afk_timeout_seconds": body.afk_timeout_seconds,
+            "join_role_id": body.join_role_id,
         }),
     )
     .await?;

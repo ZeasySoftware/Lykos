@@ -149,9 +149,10 @@ interface State {
   /** Eigene Reaktion umschalten (optimistisch; das Gateway-Echo ändert dann nichts mehr). */
   toggleReaction: (message: Message, emoji: string) => Promise<void>
 
-  createCommunity: (name: string) => Promise<void>
+  /** `joinRole` = Name der Beitrittsrolle (Pflicht beim Anlegen). */
+  createCommunity: (name: string, joinRole: string) => Promise<void>
   /** Community aus einer Discord-Servervorlage anlegen und hineinwechseln. */
-  createCommunityFromTemplate: (code: string, name: string) => Promise<void>
+  createCommunityFromTemplate: (code: string, name: string, joinRole: string) => Promise<void>
   acceptInvite: (code: string) => Promise<void>
   clearPendingInvite: () => void
   updateCommunity: (community: Community) => void
@@ -1250,8 +1251,8 @@ export const useStore = create<State>()((set, get) => {
       }
     },
 
-    async createCommunityFromTemplate(code, name) {
-      const detail = await endpoints.createCommunityFromTemplate(code, name)
+    async createCommunityFromTemplate(code, name, joinRole) {
+      const detail = await endpoints.createCommunityFromTemplate(code, joinRole, name)
       set((s) => ({
         communities: s.communities.some((c) => c.id === detail.community.id)
           ? s.communities
@@ -1261,8 +1262,8 @@ export const useStore = create<State>()((set, get) => {
       get().selectCommunity(detail.community.id)
     },
 
-    async createCommunity(name) {
-      const detail = await endpoints.createCommunity(name)
+    async createCommunity(name, joinRole) {
+      const detail = await endpoints.createCommunity(name, joinRole)
       set((s) => ({
         communities: s.communities.some((c) => c.id === detail.community.id)
           ? s.communities

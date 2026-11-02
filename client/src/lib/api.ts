@@ -321,6 +321,8 @@ export interface Community {
   afk_channel_id?: string | null
   /** Sekunden ohne Aktivität bis zum Wechsel in den AFK-Kanal. */
   afk_timeout_seconds?: number
+  /** Rolle, die neue Mitglieder beim Beitritt automatisch bekommen; `null` = keine. */
+  join_role_id?: string | null
 }
 
 /** Eintrag der Bannliste einer Community. */
@@ -868,10 +870,12 @@ export const endpoints = {
   userProfile: (id: string) => api<UserProfile>(`/users/${enc(id)}`),
 
   communities: () => api<Community[]>('/communities'),
-  createCommunity: (name: string) => api<CommunityDetail>('/communities', 'POST', { name }),
+  /** `joinRole` = Name der Beitrittsrolle, die jedes neue Mitglied automatisch bekommt. */
+  createCommunity: (name: string, joinRole: string) =>
+    api<CommunityDetail>('/communities', 'POST', { name, join_role: joinRole }),
   /** Community mit der Struktur einer Discord-Servervorlage anlegen (`code` = Code oder Link). */
-  createCommunityFromTemplate: (code: string, name?: string) =>
-    api<CommunityDetail>('/communities', 'POST', { name, discord_template: code }),
+  createCommunityFromTemplate: (code: string, joinRole: string, name?: string) =>
+    api<CommunityDetail>('/communities', 'POST', { name, discord_template: code, join_role: joinRole }),
   discordTemplate: (code: string) =>
     api<DiscordTemplatePreview>(`/communities/templates/discord/${enc(code)}`),
   community: (id: string) => api<CommunityDetail>(`/communities/${enc(id)}`),
@@ -888,6 +892,7 @@ export const endpoints = {
       welcome_message?: string | null
       afk_channel_id?: string | null
       afk_timeout_seconds?: number
+      join_role_id?: string | null
     },
   ) =>
     api<Community>(`/communities/${enc(id)}`, 'PATCH', body),

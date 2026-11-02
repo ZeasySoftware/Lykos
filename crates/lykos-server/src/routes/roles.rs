@@ -25,7 +25,7 @@ macro_rules! role_columns {
     };
 }
 
-fn validate_role_name(name: &str) -> ApiResult<String> {
+pub(crate) fn validate_role_name(name: &str) -> ApiResult<String> {
     let name = name.trim();
     if (1..=64).contains(&name.chars().count()) {
         Ok(name.to_owned())
@@ -39,6 +39,25 @@ fn validate_color(color: Option<i32>) -> ApiResult<Option<i32>> {
         Some(c) if !(0..=0xFF_FFFF).contains(&c) => Err(ApiError::BadRequest("invalid_request")),
         c => Ok(c),
     }
+}
+
+/// Gibt einem neuen Mitglied die Beitrittsrolle der Community (falls eingestellt). Läuft in der Transaktion
+/// des Beitritts, damit `MEMBER_ADD` die Rolle schon enthält.
+pub async fn assign_join_role(
+    conn: &mut sqlx::PgConnection,
+    community_id: Uuid,
+    user_id: Uuid,
+) -> ApiResult<()> {
+    sqlx::query(
+        "INSERT INTO member_roles (community_id, user_id, role_id)
+         SELECT id, $2, join_role_id FROM communities WHERE id = $1 AND join_role_id IS NOT NULL
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(community_id)
+    .bind(user_id)
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// Position der höchsten eigenen Rolle (Standardrolle ausgenommen); `None` = nur Standardrolle.
